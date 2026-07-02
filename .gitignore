@@ -52,3 +52,18 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Local test artifacts and configuration
+traces/
+test-run-log.txt
+storageState.json
+testRunContext.json
+
+# IDE settings (local only)
+.vs/
+.vscode/
+*.user
+
+# Environment files
+.env
+.env.local
