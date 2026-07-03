@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using Microsoft.Playwright;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace YourNamespace.Auth.Tests
 {
@@ -8,6 +9,8 @@ namespace YourNamespace.Auth.Tests
     [Trait("Module", "HomePage")]
     public class AuthenticationTests : TestBase
     {
+        public AuthenticationTests(ITestOutputHelper output) : base(output) { }
+
         [Fact]
         [Trait("Category", "Smoke")]
         public async Task Auth_PreTestState_UserIsLoggedInAndSeesWelcomeMessage()
