@@ -1,12 +1,15 @@
 using System.Threading.Tasks;
 using Microsoft.Playwright;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace PlaywrightAutomatedTesting.MemberManagement.Tests
 {
-    [Trait("Module", "MemberManagement")]
+    
     public class MemberSearchTests : TestBase
     {
+        public MemberSearchTests(ITestOutputHelper output) : base(output) { }
+
         [Fact]
         [Trait("Category", "Smoke")]
         public async Task MemberSearch_SearchExistingMember_DisplaysMatchingMember()

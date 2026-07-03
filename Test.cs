@@ -169,6 +169,8 @@ stage = "CONTEXT";
 statusMessage = "Writing runtime context...";
 Render();
 
+var testRunTimestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+
 var contextPath = Path.Combine(
     AppContext.BaseDirectory,
     "..",
@@ -185,7 +187,7 @@ Directory.CreateDirectory(Path.GetDirectoryName(contextPath)!);
 File.WriteAllText(
     contextPath,
     JsonSerializer.Serialize(
-        new { env, auth, tests, headless },
+        new { env, auth, tests, headless, testRunTimestamp },
         new JsonSerializerOptions { WriteIndented = true }));
 
 // ======================================================
