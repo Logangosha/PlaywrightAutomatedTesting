@@ -29,4 +29,5 @@ public class ContextModel
     public string Auth { get; set; } = "";
     public string Tests { get; set; } = "";
     public string Headless { get; set; } = "";
+    public string TestRunTimestamp { get; set; } = "";
 }
