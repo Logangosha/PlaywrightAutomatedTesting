@@ -53,9 +53,9 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 
-# Local test artifacts and configuration
-traces/
-results/
+# Local test artifacts and configuration (root-only — do not match src/results/, etc.)
+/traces/
+/results/
 test-run-log.txt
 storageState.json
 testRunContext.json
