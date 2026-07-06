@@ -1,0 +1,39 @@
+{
+  // Copy this file (e.g. configs/portal-dev.json), fill it in, then run:
+  //   dotnet run -- configs/portal-dev.json
+  // Everything except this example is gitignored — credentials stay local.
+
+  // Which project/site. Routes to its tests: the runner selects tests tagged
+  // [Trait("Site", "<this value>")]. Lowercase id, no spaces.
+  "site": "portal",
+
+  // Which environment — any value you choose (dev, qa, client-staging, ...).
+  // Must match the tests' [Trait("Env", "<this value>")].
+  "env": "dev",
+
+  // The target URL for this site + env.
+  "url": "https://portal-dev.careatc.com/",
+
+  // How to authenticate before the actions run:
+  //   none   — go straight to the actions (public pages).
+  //   manual — a browser opens; log in yourself, then confirm. Session is saved.
+  //   auto   — runs this site+env's login test (the one tagged Kind=Auth) with the
+  //            credentials below, then saves the session. See the README's
+  //            "Writing an auth test" section.
+  "auth": {
+    "mode": "manual",
+    "username": null,
+    "password": null
+  },
+
+  // Which action tests to run within this site + env: "all" or a slice using
+  // Category/Module. Combine with & (AND) or | (OR):
+  //   "Category=Smoke"                          — one category
+  //   "Category=Smoke&Module=HomePage"          — category within a module
+  //   "Module=HomePage|Module=MemberManagement" — several specific modules
+  // Site/Env/Kind are composed automatically — never write them here.
+  "actions": "Category=Smoke",
+
+  // Run browsers without a visible window.
+  "headless": true
+}

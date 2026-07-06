@@ -1,5 +1,4 @@
 using Microsoft.Playwright;
-using Xunit;
 using Xunit.Abstractions;
 using System.Reflection;
 
@@ -23,13 +22,14 @@ public class TestBase : IAsyncLifetime
 
         Browser = await Playwright.Chromium.LaunchAsync(new()
         {
-            Headless = TestRunContext.Current["headless"] == "true"
+            Headless = TestSettings.Headless
         });
 
-        Context = await Browser.NewContextAsync(new()
-        {
-            StorageStatePath = AuthenticationProvider.StorageStatePath
-        });
+        var contextOptions = new BrowserNewContextOptions();
+        if (TestSettings.StorageStatePath is not null)
+            contextOptions.StorageStatePath = TestSettings.StorageStatePath;
+
+        Context = await Browser.NewContextAsync(contextOptions);
 
         await Context.Tracing.StartAsync(new()
         {
@@ -45,29 +45,28 @@ public class TestBase : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        var moduleTraitValue = GetModuleTraitValue();
-        var testMethodName = GetTestMethodName();
-        var testRunTimestamp = TestRunContext.Current["testRunTimestamp"];
-
         var traceDirectory = Path.Combine(
-            Directory.GetCurrentDirectory(), "..", "..", "..", "traces",
-            testRunTimestamp,
-            moduleTraitValue);
+            Paths.TracesRoot,
+            TestSettings.RunTimestamp,
+            GetModuleTraitValue());
 
         Directory.CreateDirectory(traceDirectory);
 
-        var tracePath = Path.Combine(traceDirectory, $"{testMethodName}.zip");
+        var tracePath = Path.Combine(traceDirectory, $"{GetTestMethodName()}.zip");
 
         await Context.Tracing.StopAsync(new() { Path = tracePath });
+
+        if (TestSettings.SaveStorageStatePath is not null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(TestSettings.SaveStorageStatePath)!);
+            await Context.StorageStateAsync(new() { Path = TestSettings.SaveStorageStatePath });
+        }
 
         await Context.CloseAsync();
         await Browser.CloseAsync();
         Playwright.Dispose();
     }
 
-    // Reads the [Trait("Module", "...")] value from metadata.
-    // xUnit's TraitAttribute has an empty constructor body, so the values are not
-    // stored in instance fields — we must read the constructor arguments directly.
     private string GetModuleTraitValue()
     {
         foreach (var data in GetType().GetCustomAttributesData())
@@ -88,9 +87,6 @@ public class TestBase : IAsyncLifetime
         return "Uncategorized";
     }
 
-    // Retrieves the currently-running test method name. DisposeAsync is invoked by
-    // the xUnit framework (not from the test call stack), so we reflect into the
-    // ITestOutputHelper's internal ITest to get the real method name.
     private string GetTestMethodName()
     {
         var testField = _output.GetType()

@@ -1,23 +1,24 @@
-using System.Threading.Tasks;
 using Microsoft.Playwright;
-using Xunit;
 using Xunit.Abstractions;
 
-namespace YourNamespace.Auth.Tests
+namespace PlaywrightAutomatedTesting.Portal.Dev.Actions
 {
-
+    [Trait("Site", "portal")]
+    [Trait("Env", "dev")]
+    [Trait("Env", "prod")]
+    [Trait("Kind", "Action")]
     [Trait("Module", "HomePage")]
-    public class AuthenticationTests : TestBase
+    public class HomePageTests : TestBase
     {
-        public AuthenticationTests(ITestOutputHelper output) : base(output) { }
+        public HomePageTests(ITestOutputHelper output) : base(output) { }
 
         [Fact]
         [Trait("Category", "Smoke")]
         public async Task Auth_PreTestState_UserIsLoggedInAndSeesWelcomeMessage()
         {
             // --- ARRANGE ---
-            // Pre-auth already handled by StorageStatePath in TestBase
-            var baseUrl = EnvironmentProvider.Current.BaseUrl;
+            // Pre-auth already handled by storage state in TestBase
+            var baseUrl = TestSettings.BaseUrl;
 
             // --- ACT ---
             await Page.GotoAsync(baseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
@@ -28,7 +29,7 @@ namespace YourNamespace.Auth.Tests
             await welcomeHeader.WaitForAsync(new LocatorWaitForOptions
             {
                 State = WaitForSelectorState.Visible,
-                Timeout = 5000 // Adjust timeout as needed
+                Timeout = 5000
             });
 
             var text = await welcomeHeader.InnerTextAsync();
@@ -42,8 +43,7 @@ namespace YourNamespace.Auth.Tests
         public async Task MemberManagement_AfterLogin_PageHeadingIsVisible()
         {
             // --- ARRANGE ---
-            // Pre-auth assumed via StorageStatePath
-            var baseUrl = EnvironmentProvider.Current.BaseUrl;
+            var baseUrl = TestSettings.BaseUrl;
 
             // --- ACT ---
             await Page.GotoAsync(baseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
@@ -61,9 +61,7 @@ namespace YourNamespace.Auth.Tests
         public async Task MemberSearch_AfterLogin_SearchTabIsVisible()
         {
             // --- ARRANGE ---
-            // Pre-auth assumed via StorageStatePath
-            var baseUrl = EnvironmentProvider.Current.BaseUrl;
-
+            var baseUrl = TestSettings.BaseUrl;
 
             // --- ACT ---
             await Page.GotoAsync(baseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });

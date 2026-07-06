@@ -55,9 +55,14 @@ nunit-*.xml
 
 # Local test artifacts and configuration
 traces/
+results/
 test-run-log.txt
 storageState.json
 testRunContext.json
+
+# User configs hold credentials — only the example is shared
+configs/*
+!configs/example.json
 
 # IDE settings (local only)
 .vs/
