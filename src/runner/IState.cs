@@ -1,0 +1,8 @@
+// A STATE IS A SINGLE STEP IN THE RUNNERS STATE MACHINE
+// EACH STATE DOES ONE THING (LOAD CONFIG, AUTH, RUN ACTIONS, REPORT RESULTS) AND RETURNS THE NEXT STATE OR NULL TO END.
+public interface IState
+{
+    RunState Name { get; }
+
+    Task<IState?> RunAsync(RunContext ctx);
+}

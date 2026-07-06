@@ -1,11 +1,13 @@
-using System.Threading.Tasks;
 using Microsoft.Playwright;
-using Xunit;
 using Xunit.Abstractions;
 
-namespace PlaywrightAutomatedTesting.MemberManagement.Tests
+namespace PlaywrightAutomatedTesting.Portal.Dev.Actions
 {
-    
+    [Trait("Site", "portal")]
+    [Trait("Env", "dev")]
+    [Trait("Env", "prod")]
+    [Trait("Kind", "Action")]
+    [Trait("Module", "MemberManagement")]
     public class MemberSearchTests : TestBase
     {
         public MemberSearchTests(ITestOutputHelper output) : base(output) { }
@@ -15,7 +17,7 @@ namespace PlaywrightAutomatedTesting.MemberManagement.Tests
         public async Task MemberSearch_SearchExistingMember_DisplaysMatchingMember()
         {
             // --- ARRANGE ---
-            var baseUrl = EnvironmentProvider.Current.BaseUrl;
+            var baseUrl = TestSettings.BaseUrl;
 
             await Page.GotoAsync(baseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
 
@@ -29,7 +31,7 @@ namespace PlaywrightAutomatedTesting.MemberManagement.Tests
                 globalSearch.PressAsync("Enter")
             );
 
-            await Page.GetByRole(AriaRole.Link, new() { Name = " Member Search" })
+            await Page.GetByRole(AriaRole.Link, new() { Name = " Member Search" })
                 .Nth(1)
                 .ClickAsync();
 
@@ -37,7 +39,7 @@ namespace PlaywrightAutomatedTesting.MemberManagement.Tests
 
             await memberName.FillAsync("sam willis");
 
-            await Page.GetByRole(AriaRole.Button, new() { Name = " Search" })
+            await Page.GetByRole(AriaRole.Button, new() { Name = " Search" })
                 .ClickAsync();
 
             var memberRow = Page.Locator("tr").Filter(new()
