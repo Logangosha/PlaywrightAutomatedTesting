@@ -114,20 +114,37 @@ JSON comments and trailing commas are allowed, so keep the comments in your copy
 into them for you: it selects `Site=portal & Env=dev & Kind=Auth` for the
 login, and `Site=portal & Env=dev & Kind=Action` (plus your `actions` slice)
 for the run. So `actions` only needs the slice *within* the target, using
-`Category` and/or `Module`:
+`Category` and/or `Module` to group, or `FullyQualifiedName` to pick one exact
+test:
 
 ```
 "all"                                       — every action test for this site + env
 "Category=Smoke"                            — one category
 "Category=Smoke&Module=HomePage"            — category AND module
 "Module=HomePage|Module=MemberManagement"   — either module (OR)
+"FullyQualifiedName=PortalTests.Dev.Actions.HomePageTests.ClickLogin"
+                                            — one specific test
+"FullyQualifiedName=…HomePageTests.ClickLogin|FullyQualifiedName=…HomePageTests.SearchBar"
+                                            — two specific tests (OR them)
+"Category=Smoke|FullyQualifiedName=…HomePageTests.SearchBar"
+                                            — a category plus one extra test
 ```
 
-Only `Category` and `Module` are allowed in the slice — the config loader
-rejects anything else (including hand-written `Site=`/`Env=`/`Kind=`).
+Only `Category`, `Module`, and `FullyQualifiedName` are allowed in the slice —
+the config loader rejects anything else (including hand-written
+`Site=`/`Env=`/`Kind=`).
+
+`FullyQualifiedName` is not a trait you tag on a test — it's the built-in
+`Namespace.Class.Method` identity every test already has, so nothing changes in
+your test files to use it. You normally don't type it by hand (a UI fills it in
+from test discovery); the trade-off is that renaming or moving a test changes
+its `FullyQualifiedName`, so an old config that pins a specific test silently
+stops matching it after a refactor.
+
 Note that values aren't checked against your tests: a typo like
-`Category=Smok` loads fine, matches zero tests, and the run completes with
-exit code `0` — if you expected tests and got none, check the slice first.
+`Category=Smok` — or a stale `FullyQualifiedName` — loads fine, matches zero
+tests, and the run completes with exit code `0`. If you expected tests and got
+none, check the slice first.
 
 ### Secrets
 

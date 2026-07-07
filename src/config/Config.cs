@@ -70,8 +70,10 @@ public class Config : IConfig
 
         if (!IsValidActionsSlice(Actions))
             throw new Exception(
-                $"'actions' must be \"all\" or Category/Module filters like \"Category=Smoke&Module=HomePage\", " +
-                $"and may OR alternatives with | (e.g. \"Module=HomePage|Module=MemberManagement\") " +
+                $"'actions' must be \"all\" or Category/Module/FullyQualifiedName filters like " +
+                $"\"Category=Smoke&Module=HomePage\", and may OR alternatives with | (e.g. " +
+                $"\"Module=HomePage|Module=MemberManagement\" or " +
+                $"\"FullyQualifiedName=Ns.Class.TestA|FullyQualifiedName=Ns.Class.TestB\") " +
                 $"(Site/Env/Kind are composed automatically from site+env). Got '{Actions}' in {path}");
     }
 
@@ -86,15 +88,17 @@ public class Config : IConfig
             throw new Exception($"'{key}' must not contain &, |, =, !, parentheses, or spaces. Got '{value}' in {path}");
     }
 
-    // VALIDATES THAT THE ACTIONS SLICE IS EITHER "ALL" OR A COMMA-SEPARATED LIST OF CATEGORY/MODULE FILTERS.
+    // VALIDATES THAT THE ACTIONS SLICE IS EITHER "ALL" OR A LIST OF CATEGORY/MODULE/FULLYQUALIFIEDNAME FILTERS.
     private static bool IsValidActionsSlice(string input)
     {
         // ALLOW "ALL" OR EMPTY TO RUN ALL TESTS.
         if (string.IsNullOrWhiteSpace(input) || input.Equals("all", StringComparison.OrdinalIgnoreCase))
             return true;
 
-        // SET OF ALLOWED KEYS FOR FILTERING TESTS. ONLY "Category" AND "Module" ARE ALLOWED.
-        var allowedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Category", "Module" };
+        // SET OF ALLOWED KEYS FOR FILTERING TESTS. "Category"/"Module" GROUP TESTS; "FullyQualifiedName"
+        // PICKS ONE SPECIFIC TEST BY ITS Namespace.Class.Method IDENTITY (a built-in vstest property,
+        // NOT A TRAIT — nothing is tagged on the test to support it).
+        var allowedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Category", "Module", "FullyQualifiedName" };
 
         // SPLIT THE INPUT BY & OR | AND VALIDATE EACH PART.
         foreach (var part in input.Split(new[] { '&', '|' }, StringSplitOptions.RemoveEmptyEntries))
