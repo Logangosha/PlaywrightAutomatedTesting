@@ -39,6 +39,13 @@ dotnet run -- configs/portal-dev.json
 Exit codes: `0` no tests failed · `1` some tests failed · `2` the runner faulted
 (or no config argument was given).
 
+To see what's available before writing a config, list every test grouped by
+site → env → module (this runs nothing):
+
+```bash
+dotnet run -- discover
+```
+
 ## What a run looks like
 
 The runner walks a fixed sequence of states and always ends with a report:
@@ -159,11 +166,12 @@ for the deeper conventions.
 
 | Component | Folder | Role |
 |---|---|---|
-| Config  | [src/config](src/config)   | Loads and validates the config the user provides |
-| Auth    | [src/auth](src/auth)       | Establishes a session, saves `storageState.json` |
-| Actions | [src/actions](src/actions) | Delegates the selected tests to xUnit (`dotnet test`), parses the TRX |
-| Runner  | [src/runner](src/runner)   | State machine orchestrating the run — always ends in a result |
-| Results | [src/results](src/results) | Presents the run result to the user |
+| Config    | [src/config](src/config)       | Loads and validates the config the user provides |
+| Auth      | [src/auth](src/auth)           | Establishes a session, saves `storageState.json` |
+| Actions   | [src/actions](src/actions)     | Delegates the selected tests to xUnit (`dotnet test`), parses the TRX |
+| Runner    | [src/runner](src/runner)       | State machine orchestrating the run — always ends in a result |
+| Results   | [src/results](src/results)     | Presents the run result to the user |
+| Discovery | [src/discovery](src/discovery) | Lists the available tests (the "menu") so a frontend can browse and select — runs nothing |
 
 [Program.cs](Program.cs) is only the console wiring; the backend is
 frontend-agnostic, so an API or UI could drive the same `Runner`. The runner

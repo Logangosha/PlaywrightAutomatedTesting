@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 dotnet build                          # build (runner + tests are ONE project)
 dotnet run -- configs/my-config.json  # run with a config (the only required argument)
+dotnet run -- discover                # list available tests (Site→Env→Module); runs nothing
 ```
 
 Run from the repo root — the config path resolves against the CWD. Configs are
@@ -34,13 +35,16 @@ these when it spawns the test process:
 Config-driven pipeline: the user hands the runner a config file; the runner
 walks a state machine and always ends by reporting a `RunResult`.
 
-**Five components, five interfaces** (one folder each under `src/`):
+**Six components, six interfaces** (one folder each under `src/`). Five form the run
+pipeline (Config, Auth, Actions, Runner, Results); Discovery sits *beside* it — a
+frontend-facing menu, not part of any run:
 
 - `IConfig` / `Config` (`src/config`) — loads + validates the config: `site` (routing id), `env` (environment id, any value), `url` (target URL), `auth` (composite: none | manual | auto), `actions` (the slice within the target, e.g. `Category=Smoke` or `all`), `headless` (bool). `site`+`env` identify *which* tests; `actions` narrows *which of those*. JSON is parsed case-insensitively with comments and trailing commas allowed. Validation faults on: missing/invalid `site`/`env` (no `& | = ! ( )` or spaces — they'd break filter syntax), non-http(s) `url`, unknown `auth.mode`, `auto` without credentials, or an `actions` slice using any key other than `Category`/`Module`/`FullyQualifiedName` (the last picks one exact test by its `Namespace.Class.Method` — a built-in vstest property, not a trait).
 - `IAuth` / `Auth` (`src/auth`) — establishes a session, saves `src/auth/storageState.json` (path from `Paths.StorageStatePath`). Manual mode opens a headed browser and needs a frontend-supplied `waitForUser` callback (faults if the frontend didn't provide one). **Auto mode is website-agnostic: the runner composes the login selector `Site={site}&Env={env}&Kind=Auth` (must match exactly one test — zero or multiple matches fault), runs that login test — it drives the site's login UI reading `TestSettings.LoginUsername/Password` and asserts success — and `TestBase` saves the session (`SAVE_STORAGE_STATE`).** A failing login test (e.g. wrong password) becomes a Faulted result; so does a passing one that somehow saved no session file. Auth's login-test results go to `results/<timestamp>/auth/` so they never collide with the action run's TRX.
 - `IActions` / `Actions` (`src/actions`) — composes the actions selector `Site={site}&Env={env}&Kind=Action` (+ the config's `actions` slice), so `Kind=Auth` login tests are never run as actions. The slice is wrapped in parentheses — `…&Kind=Action&(Module=A|Module=B)` — so an OR inside it can't leak tests from other sites/envs. Defers to the shared `TestProcess` (`src/TestProcess.cs`), which spawns `dotnet test --no-build`, passes config via env vars, streams per-test progress lines, and parses the TRX into `TestResult`s. xUnit owns test iteration — the runner never loops over tests itself.
 - `IRunner` / `Runner` (`src/runner`) — state pattern: `IState.RunAsync(ctx)` returns the next state (`null` = done); `RunContext.Current` always holds the current `RunState`, so "where are we" is knowable even mid-crash. States: ReadingConfig → VerifyingEnv → Authenticating → RunningActions → Reporting → Completed. Any exception → Faulted (recording `FaultedDuring`), and the result is still reported. `RunContext` also mints the run's single timestamp that groups traces + results. VerifyingEnv is a 15s GET; *any* HTTP status counts as reachable — only a thrown exception (DNS, refused, timeout) faults.
 - `IResults` / `Results` (`src/results`) — console presenter for `RunResult` (PASSED / FAILED / FAULTED verdict, per-test lines, totals, trace/log paths). Swap per frontend. `RunResult` (`src/results/RunResult.cs`) is the single output object: final state, config echo, `TestResult` list, counts, duration, artifact paths.
+- `IDiscovery` / `Discovery` (`src/discovery`) — the **menu**: lists the available tests without running any, so a frontend can draw the Site→Env→Module tree, offer a selection, and resolve the auto-auth login test *before* a run. A leaf requiring no config; consumed by the *frontend*, never by the Runner (the run pipeline is unchanged). `Discover()` returns `DiscoveredTest`s (`FullyQualifiedName`, `Site`, `Envs` — **multi-valued**, `Kind`, nullable `Module`/`Category`) by **reflecting over the test assembly's `[Trait]` attributes** — the same `GetCustomAttributesData` approach `TestBase` uses, so no extra dependency. `FullyQualifiedName` is normalized (`+`→`.`) to match vstest exactly. Exercised by `dotnet run -- discover`.
 
 `Program.cs` (root) is the composition root and the only console-aware wiring
 (it also supplies the `waitForUser` callback as a console ReadLine); the
@@ -73,6 +77,7 @@ the code is authoritative.
 - **`TestBase.DisposeAsync` saves the session before closing the context** — that ordering matters; the `SAVE_STORAGE_STATE` handoff is how a login test's session reaches Auth.
 - **`TestBase` reads the `Module` trait and test method name via reflection** (attribute constructor args; xUnit internals for the method name) — renaming those internals or the trait key breaks trace pathing, not compilation.
 - Auth's login-test TRX lives in `results/<timestamp>/auth/`; the action run's in `results/<timestamp>/`. Same `TestProcess`, different `resultsDir` — keep it that way or they overwrite each other.
+- **Discovery reads metadata, not xUnit's discovery** — `Discovery` reflects over `[Trait]` attributes directly, so it assumes the suite's convention holds: plain `[Fact]`/`[Theory]` + literal `[Trait]` (Site/Env/Kind/Module on the class, Category on the method). A `[Theory]` surfaces as **one** node (data rows aren't enumerated); traits from inheritance or a custom `ITraitDiscoverer` are invisible. Neither bites today. If per-data-row discovery is ever needed, swap the implementation for the VSTest TranslationLayer behind the same `IDiscovery` — nothing else changes. (This is the same reflection-vs-real-discovery trade `TestBase` already lives with for the `Module` trait.)
 
 ## Adding a new site (recipe)
 
