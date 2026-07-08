@@ -1,0 +1,562 @@
+@page "/"
+@inject RunnerHost Runner
+@inject IDiscovery Discovery
+@inject ArtifactOpener Artifacts
+
+@* "New run" — the Configure → Run → Results stepper.
+   Configure is discovery-driven: Site/Env are dropdowns from the discovered tests,
+   and "Tests to run" is an always-visible surface — All, categories, and a
+   module→tests tree — that can be combined. Selections OR together into the actions
+   slice (shown live). Auth = none for now. *@
+
+<h1>New run</h1>
+
+<div class="stepper">
+    <span class="step @StepClass(Step.Configure)"><span class="dot">1</span> Configure</span>
+    <span class="step-line"></span>
+    <span class="step @StepClass(Step.Running)"><span class="dot">2</span> Run</span>
+    <span class="step-line"></span>
+    <span class="step @StepClass(Step.Results)"><span class="dot">3</span> Results</span>
+</div>
+
+@if (_step == Step.Configure)
+{
+    <div class="form">
+        <div class="row">
+            <div class="field">
+                <label>Site</label>
+                <select @bind="_site" @bind:after="OnSiteChanged">
+                    <option value="">Select a site…</option>
+                    @foreach (var s in Sites)
+                    {
+                        <option value="@s">@s</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label>Env</label>
+                <select @bind="_env" @bind:after="OnEnvChanged" disabled="@(_site.Length == 0)">
+                    <option value="">Select an environment…</option>
+                    @foreach (var e in EnvsForSite)
+                    {
+                        <option value="@e">@e</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="field">
+            <label>URL</label>
+            <input @bind="_url" placeholder="https://portal-dev.example.com/" />
+        </div>
+
+        <div class="field">
+            <label>Tests to run</label>
+
+            @if (_env.Length == 0)
+            {
+                <span class="muted">Pick a site and env to choose tests.</span>
+            }
+            else
+            {
+                <label class="chk all-toggle">
+                    <input type="checkbox" @bind="_allTests" />
+                    <strong>All tests</strong> <span class="muted">— everything for @_site / @_env</span>
+                </label>
+
+                @if (Categories.Count > 0)
+                {
+                    <div class="sel-group">
+                        <div class="sel-label">Categories</div>
+                        <div class="checklist">
+                            @foreach (var c in Categories)
+                            {
+                                <label class="chk">
+                                    <input type="checkbox" checked="@(_allTests || _categories.Contains(c))"
+                                           disabled="@_allTests"
+                                           @onchange="e => Toggle(_categories, c, (bool)e.Value!)" />
+                                    @c
+                                </label>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <div class="sel-group">
+                    <div class="sel-label">Modules &amp; tests</div>
+                    @foreach (var m in ModuleGroups)
+                    {
+                        var moduleSelected = _modules.Contains(m.Name);
+                        <details class="sel-module">
+                            <summary>
+                                <label class="chk" @onclick:stopPropagation="true">
+                                    <input type="checkbox" checked="@(_allTests || moduleSelected)"
+                                           disabled="@_allTests"
+                                           @onchange="e => ToggleModule(m, (bool)e.Value!)" />
+                                    <span class="mod-name">@m.Name</span>
+                                </label>
+                                <span class="pill">@m.Tests.Count</span>
+                            </summary>
+                            <div class="sel-tests">
+                                @foreach (var t in m.Tests)
+                                {
+                                    var coveredBroadly = _allTests || moduleSelected
+                                        || (t.Category is not null && _categories.Contains(t.Category));
+                                    <label class="chk">
+                                        <input type="checkbox"
+                                               checked="@(coveredBroadly || _tests.Contains(t.Fqn))"
+                                               disabled="@coveredBroadly"
+                                               @onchange="e => Toggle(_tests, t.Fqn, (bool)e.Value!)" />
+                                        @if (t.Category is not null)
+                                        {
+                                            <span class="chip">@t.Category</span>
+                                        }
+                                        <span class="method">@t.Method</span>
+                                    </label>
+                                }
+                            </div>
+                        </details>
+                    }
+                </div>
+
+                <span class="hint">Will run: <code>@PreviewSlice()</code></span>
+            }
+        </div>
+
+        <label class="check">
+            <input type="checkbox" @bind="_headless" />
+            Headless
+        </label>
+
+        <div class="note">Auth is <strong>none</strong> for now (auto/manual come in a later step).</div>
+
+        @if (_error is not null)
+        {
+            <div class="error-box">@_error</div>
+        }
+
+        <div class="actions">
+            <button class="btn-primary" @onclick="StartRun" disabled="@(!CanRun)">Run</button>
+        </div>
+    </div>
+}
+else if (_step == Step.Running)
+{
+    <div class="live">
+        <div class="phase-strip">
+            @for (var i = 0; i < Phases.Length; i++)
+            {
+                var idx = i;
+                <span class="phase @PhaseClass(idx)">
+                    <span class="pdot">@(PhaseIndex > idx ? "✓" : (idx + 1).ToString())</span>
+                    @Phases[idx].Label
+                </span>
+            }
+        </div>
+
+        <div class="run-status">
+            <div class="spinner"></div>
+            <span class="muted">@(_lastStatus ?? "Starting…")</span>
+        </div>
+
+        @if (_live.Count > 0)
+        {
+            <div class="totals">
+                <span>@_live.Count run</span>
+                <span class="status-pass">@LivePassed passed</span>
+                <span class="status-fail">@LiveFailed failed</span>
+                @if (LiveSkipped > 0)
+                {
+                    <span>@LiveSkipped skipped</span>
+                }
+            </div>
+
+            <div class="test-list">
+                @foreach (var t in _live)
+                {
+                    <div class="test-row">
+                        <span class="@(t.Outcome == "Passed" ? "badge-pass" : t.Outcome == "Failed" ? "badge-fail" : "")">
+                            @(t.Outcome == "Passed" ? "PASS" : t.Outcome == "Failed" ? "FAIL" : t.Outcome)
+                        </span>
+                        <span class="test-name">@t.Name</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+else if (_step == Step.Results && _result is not null)
+{
+    var r = _result;
+    <div class="result">
+        <div class="verdict @VerdictClass(r)">@Verdict(r)</div>
+
+        <div class="result-meta">
+            <span>@r.Site / @r.Env</span>
+            <span class="muted">·</span>
+            <span class="muted">@r.Actions</span>
+            <span class="muted">·</span>
+            <span class="muted">@(r.Headless ? "headless" : "headed")</span>
+        </div>
+
+        <div class="totals">
+            <span>@r.Tests.Count total</span>
+            <span class="status-pass">@r.PassedCount passed</span>
+            <span class="status-fail">@r.FailedCount failed</span>
+            <span>@r.SkippedCount skipped</span>
+            <span class="muted">@r.Duration.TotalSeconds.ToString("0.0")s</span>
+        </div>
+
+        @if (r.FinalState == RunState.Faulted)
+        {
+            <div class="error-box">Faulted during @r.FaultedDuring: @r.Error</div>
+        }
+
+        @if (r.Tests.Count > 0)
+        {
+            <div class="test-list">
+                @foreach (var t in r.Tests)
+                {
+                    <details class="res-test" open="@t.Failed">
+                        <summary>
+                            <span class="@(t.Passed ? "badge-pass" : t.Failed ? "badge-fail" : "")">
+                                @(t.Passed ? "PASS" : t.Failed ? "FAIL" : t.Outcome)
+                            </span>
+                            <span class="test-name">@t.Name</span>
+                            <span class="muted">@t.Duration.TotalSeconds.ToString("0.0")s</span>
+                            <button class="link-btn" @onclick="() => OpenTrace(t)" @onclick:preventDefault="true" @onclick:stopPropagation="true" title="Open this test's Playwright trace">View trace</button>
+                        </summary>
+                        @if (!string.IsNullOrWhiteSpace(t.Error))
+                        {
+                            <pre class="err">@t.Error</pre>
+                        }
+                    </details>
+                }
+            </div>
+        }
+
+        @if (_artifactMsg is not null)
+        {
+            <div class="muted small">@_artifactMsg</div>
+        }
+
+        <div class="artifact-bar">
+            <button class="btn-ghost" @onclick="OpenTracePicker">Open a trace…</button>
+            @if (r.TracesDir is not null)
+            {
+                <button class="btn-ghost" @onclick="() => SafeOpen(() => Artifacts.OpenPath(r.TracesDir!))">Open traces folder</button>
+            }
+            @if (r.LogPath is not null)
+            {
+                <button class="btn-ghost" @onclick="() => SafeOpen(() => Artifacts.OpenPath(r.LogPath!))">Open log</button>
+            }
+        </div>
+
+        @if (_showTracePicker)
+        {
+            <div class="modal-overlay" @onclick="() => _showTracePicker = false">
+                <div class="modal" @onclick:stopPropagation="true">
+                    <div class="modal-head">
+                        <span>Open a trace</span>
+                        <button class="link-btn" @onclick="() => _showTracePicker = false">Close</button>
+                    </div>
+                    <div class="trace-picker">
+                        @foreach (var f in _traceFiles)
+                        {
+                            <button class="trace-item" @onclick="() => ChooseTrace(f.FullPath)">
+                                <span class="ti-ico">▸</span>@f.Relative
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="actions">
+            <button class="btn-primary" @onclick="Reset">New run</button>
+        </div>
+    </div>
+}
+
+@code {
+    private enum Step { Configure, Running, Results }
+
+    private IReadOnlyList<DiscoveredTest> _all = Array.Empty<DiscoveredTest>();
+
+    private Step _step = Step.Configure;
+
+    private string _site = "";
+    private string _env = "";
+    private string _url = "";
+    private bool _headless = true;
+
+    private bool _allTests;
+    private readonly HashSet<string> _categories = new();
+    private readonly HashSet<string> _modules = new();       // whole-module picks (Module=)
+    private readonly HashSet<string> _tests = new();         // individual picks (FullyQualifiedName=)
+
+    private RunResult? _result;
+    private string? _error;
+    private string? _lastStatus;
+
+    // Live-run streaming state (M3). onStatus fires on background threads, so guard
+    // the lists with _sync and marshal re-renders with InvokeAsync(StateHasChanged).
+    private readonly object _sync = new();
+    private string? _phase;
+    private readonly List<LiveTest> _live = new();
+
+    private static readonly (string Key, string Label)[] Phases =
+    {
+        ("ReadingConfig",  "Reading config"),
+        ("VerifyingEnv",   "Verifying env"),
+        ("Authenticating", "Authenticating"),
+        ("RunningActions", "Running tests"),
+        ("Reporting",      "Reporting"),
+    };
+
+    private int PhaseIndex => _phase is null ? -1 : Array.FindIndex(Phases, p => p.Key == _phase);
+    private string PhaseClass(int i) => i == PhaseIndex ? "active" : i < PhaseIndex ? "done" : "";
+
+    private int LivePassed => _live.Count(t => t.Outcome == "Passed");
+    private int LiveFailed => _live.Count(t => t.Outcome == "Failed");
+    private int LiveSkipped => _live.Count(t => t.Outcome != "Passed" && t.Outcome != "Failed");
+
+    protected override void OnInitialized() => _all = Discovery.Discover();
+
+    // --- Discovery-driven options ---
+    private List<string> Sites =>
+        _all.Select(t => t.Site).Distinct().OrderBy(s => s).ToList();
+
+    private List<string> EnvsForSite =>
+        _all.Where(t => t.Site == _site)
+            .SelectMany(t => t.Envs).Distinct().OrderBy(e => e).ToList();
+
+    private IEnumerable<DiscoveredTest> ScopedActionTests =>
+        _all.Where(t => t.Site == _site && t.Envs.Contains(_env) && t.Kind != "Auth");
+
+    private List<string> Categories =>
+        ScopedActionTests.Where(t => t.Category is not null)
+            .Select(t => t.Category!).Distinct().OrderBy(c => c).ToList();
+
+    private List<ModuleGroup> ModuleGroups =>
+        ScopedActionTests.Where(t => t.Module is not null)
+            .GroupBy(t => t.Module!)
+            .OrderBy(g => g.Key)
+            .Select(g => new ModuleGroup(
+                g.Key,
+                g.Select(t => new TestItem(t.Method, t.FullyQualifiedName, t.Category))
+                 .OrderBy(x => x.Method).ToList()))
+            .ToList();
+
+    private void OnSiteChanged()
+    {
+        _env = "";
+        ClearSelection();
+    }
+
+    private void OnEnvChanged() => ClearSelection();
+
+    private void ClearSelection()
+    {
+        _allTests = false;
+        _categories.Clear();
+        _modules.Clear();
+        _tests.Clear();
+    }
+
+    private static void Toggle(HashSet<string> set, string value, bool on)
+    {
+        if (on) set.Add(value); else set.Remove(value);
+    }
+
+    // Selecting a whole module supersedes its individual test picks (they're covered),
+    // so drop them to keep the slice clean and the child checkboxes disabled.
+    private void ToggleModule(ModuleGroup m, bool on)
+    {
+        if (on)
+        {
+            _modules.Add(m.Name);
+            foreach (var t in m.Tests) _tests.Remove(t.Fqn);
+        }
+        else
+        {
+            _modules.Remove(m.Name);
+        }
+    }
+
+    // All picks OR together into one flat slice. Each part is a single key type, so no
+    // parentheses are needed inside (the runner wraps the whole slice in one paren group).
+    private string ComposeActions()
+    {
+        if (_allTests) return "all";
+
+        var parts = new List<string>();
+        parts.AddRange(_modules.OrderBy(m => m).Select(m => $"Module={m}"));
+        parts.AddRange(_categories.OrderBy(c => c).Select(c => $"Category={c}"));
+        parts.AddRange(_tests.OrderBy(f => f).Select(f => $"FullyQualifiedName={f}"));
+        return string.Join("|", parts);
+    }
+
+    private string PreviewSlice()
+    {
+        var s = ComposeActions();
+        return s.Length > 0 ? s : "nothing selected yet";
+    }
+
+    private bool HasSelection => _allTests || _modules.Count > 0 || _categories.Count > 0 || _tests.Count > 0;
+
+    private bool CanRun =>
+        _site.Length > 0 && _env.Length > 0 && _url.Trim().Length > 0 && HasSelection;
+
+    private async Task StartRun()
+    {
+        _error = null;
+        _lastStatus = null;
+        _phase = null;
+        _live.Clear();
+        _step = Step.Running;
+        StateHasChanged();
+
+        var input = new RunInput
+        {
+            Site = _site,
+            Env = _env,
+            Url = _url,
+            Actions = ComposeActions(),
+            Headless = _headless
+        };
+
+        try
+        {
+            _result = await Runner.RunAsync(input, OnStatus);
+            _step = Step.Results;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _step = Step.Configure;
+        }
+    }
+
+    // Parses one streamed status line ("[Phase] message", and for tests
+    // "[RunningActions] Passed <name> [1.2s]") into the live phase + results.
+    private void OnStatus(string line)
+    {
+        lock (_sync)
+        {
+            var (phase, body) = SplitPrefix(line);
+            if (phase is not null) _phase = phase;
+            _lastStatus = body;
+
+            var test = ParseTestLine(body);
+            if (test is not null) _live.Add(test);
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    // "[RunningActions] rest" -> ("RunningActions", "rest"); no prefix -> (null, line).
+    private static (string? Phase, string Body) SplitPrefix(string line)
+    {
+        if (line.StartsWith('['))
+        {
+            var close = line.IndexOf(']');
+            if (close > 1)
+                return (line[1..close], line[(close + 1)..].TrimStart());
+        }
+        return (null, line);
+    }
+
+    private static LiveTest? ParseTestLine(string body)
+    {
+        foreach (var outcome in new[] { "Passed", "Failed", "Skipped" })
+        {
+            if (body.StartsWith(outcome + " "))
+            {
+                var rest = body[(outcome.Length + 1)..];
+                var bracket = rest.LastIndexOf(" [", StringComparison.Ordinal);
+                var name = bracket >= 0 ? rest[..bracket] : rest;
+                return new LiveTest(name.Trim(), outcome);
+            }
+        }
+        return null;
+    }
+
+    private void Reset()
+    {
+        _result = null;
+        _error = null;
+        _artifactMsg = null;
+        _showTracePicker = false;
+        _step = Step.Configure;
+    }
+
+    private string? _artifactMsg;
+
+    // Opening artifacts shells out to the OS, which can throw (missing pwsh, etc.);
+    // surface the failure inline instead of letting it crash the UI.
+    private void SafeOpen(Action open)
+    {
+        try { open(); _artifactMsg = null; }
+        catch (Exception ex) { _artifactMsg = ex.Message; }
+    }
+
+    private void OpenTrace(TestResult t)
+    {
+        var zip = Artifacts.FindTraceZip(_result?.TracesDir, t.Name);
+        if (zip is null)
+        {
+            _artifactMsg = $"No trace found for {t.Name}.";
+            return;
+        }
+        LaunchTrace(zip);
+    }
+
+    // In-app trace picker scoped to this run's traces folder (so the user starts
+    // right in the current trace directory, which the OS file dialog can't target).
+    private bool _showTracePicker;
+    private IReadOnlyList<(string Relative, string FullPath)> _traceFiles = Array.Empty<(string, string)>();
+
+    private void OpenTracePicker()
+    {
+        _traceFiles = Artifacts.ListTraces(_result?.TracesDir);
+        if (_traceFiles.Count == 0)
+        {
+            _artifactMsg = "No traces were produced for this run.";
+            return;
+        }
+        _artifactMsg = null;
+        _showTracePicker = true;
+    }
+
+    private void ChooseTrace(string fullPath)
+    {
+        _showTracePicker = false;
+        LaunchTrace(fullPath);
+    }
+
+    private void LaunchTrace(string zipPath)
+    {
+        try
+        {
+            Artifacts.OpenTrace(zipPath);
+            _artifactMsg = "Opening the Playwright trace viewer… it can take a few seconds and may appear behind this window.";
+        }
+        catch (Exception ex)
+        {
+            _artifactMsg = $"Couldn't open the trace viewer: {ex.Message}";
+        }
+    }
+
+    private string StepClass(Step s) =>
+        _step == s ? "active" : (int)_step > (int)s ? "done" : "";
+
+    private static string Verdict(RunResult r) =>
+        r.FinalState == RunState.Faulted ? "FAULTED" : r.FailedCount > 0 ? "FAILED" : "PASSED";
+
+    private static string VerdictClass(RunResult r) =>
+        r.FinalState == RunState.Faulted ? "v-fault" : r.FailedCount > 0 ? "v-fail" : "v-pass";
+
+    private record ModuleGroup(string Name, List<TestItem> Tests);
+    private record TestItem(string Method, string Fqn, string? Category);
+    private record LiveTest(string Name, string Outcome);
+}

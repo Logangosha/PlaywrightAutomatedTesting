@@ -5,8 +5,18 @@
 /// </summary>
 public static class Paths
 {
-    public static string ProjectRoot { get; } =
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
+    private static string? _projectRootOverride;
+
+    /// <summary>
+    /// Lets a frontend hosted outside the runner's own bin/Debug/net8.0 set the
+    /// project root explicitly (e.g. the Blazor UI, whose base directory is its own
+    /// bin — the three-levels-up default would resolve wrongly there). The console
+    /// runner never calls this and keeps the default heuristic.
+    /// </summary>
+    public static void SetProjectRoot(string root) => _projectRootOverride = Path.GetFullPath(root);
+
+    public static string ProjectRoot =>
+        _projectRootOverride ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
 
     /// <summary>Playwright session file (Playwright's conventional name is kept).</summary>
     public static string StorageStatePath =>

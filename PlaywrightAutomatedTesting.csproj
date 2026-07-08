@@ -12,6 +12,11 @@
          so suppress the Test SDK's auto-generated Main. `dotnet test`
          still discovers and runs the xUnit tests normally. -->
     <GenerateProgramFile>false</GenerateProgramFile>
+
+    <!-- The Blazor Hybrid UI lives in ui/ within this repo. This csproj globs all
+         *.cs under the repo root, so exclude ui/ — otherwise it would pull the UI's
+         files into the runner/test assembly. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);ui\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

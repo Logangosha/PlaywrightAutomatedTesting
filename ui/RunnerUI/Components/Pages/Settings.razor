@@ -1,0 +1,34 @@
+@page "/settings"
+@inject IJSRuntime JS
+
+@* App preferences. The theme override sits on top of the follow-system default:
+   it sets data-theme on <html> (via the script in index.html), which app.css
+   uses to override the OS light/dark media query. Persisted in localStorage. *@
+
+<h1>Settings</h1>
+
+<div class="field" style="max-width: 260px;">
+    <label>Theme</label>
+    <select @bind="_theme" @bind:after="ApplyTheme">
+        <option value="system">System (default)</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+    </select>
+    <span class="hint">Overrides your OS light/dark setting for this app.</span>
+</div>
+
+@code {
+    private string _theme = "system";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // JS interop is only available after the first render.
+        if (firstRender)
+        {
+            _theme = await JS.InvokeAsync<string>("getAppTheme");
+            StateHasChanged();
+        }
+    }
+
+    private async Task ApplyTheme() => await JS.InvokeVoidAsync("setAppTheme", _theme);
+}

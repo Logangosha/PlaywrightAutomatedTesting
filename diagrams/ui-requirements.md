@@ -104,3 +104,13 @@ carries verdict, counts, per-test results, and artifact paths.
   the user's confirmation click.
 - ~~**Test-discovery mechanism.**~~ **Resolved** — `IDiscovery` / `Discovery`
   (reflection, Option B). See FR-1.1.
+
+
+## milestone sequence 
+Slice	What you'd see & judge	Reuses
+0	Scaffold — empty app in the repo, references the runner, one "hello" screen	"It builds and runs on my machine"	project wiring
+1	Test browser (FR-1.1) — the Site→Env→Module tree, read-only	"Does the tree look right and usable?"	IDiscovery (done)
+2	Config + launch (FR-1.2–1.5, auth: none) — build a config, hit Run, see a crude result	"The remote-control loop works end-to-end"	IRunner
+3	Live run (FR-3) — phase + per-test streaming while it runs	"Can I tell what's happening?"	runner's onProgress/onStatus
+4	Post-run (FR-4) — verdict, counts, open trace/log buttons	"Is the summary clear?"	RunResult
+5	Auth — auto first (creds in config), then manual (the pause/resume click)	"Both login modes work"	IAuth

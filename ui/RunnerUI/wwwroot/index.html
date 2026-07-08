@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>RunnerUI</title>
+    <base href="/" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="RunnerUI.styles.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+
+    <script>
+        // Theme override: "system" (default) follows the OS; "light"/"dark" set
+        // data-theme on <html>, which app.css uses to override the media query.
+        // Persisted in localStorage and applied here on load to avoid a flash.
+        window.setAppTheme = function (t) {
+            try {
+                if (t === 'system') {
+                    localStorage.removeItem('theme');
+                    document.documentElement.removeAttribute('data-theme');
+                } else {
+                    localStorage.setItem('theme', t);
+                    document.documentElement.setAttribute('data-theme', t);
+                }
+            } catch (e) { }
+        };
+        window.getAppTheme = function () {
+            try { return localStorage.getItem('theme') || 'system'; } catch (e) { return 'system'; }
+        };
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (t) document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { }
+        })();
+    </script>
+</head>
+
+<body>
+
+    <div class="status-bar-safe-area"></div>
+
+    <div id="app">Loading...</div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+
+</body>
+
+</html>

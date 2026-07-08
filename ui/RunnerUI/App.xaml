@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:RunnerUI"
+             x:Class="RunnerUI.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- The whole UI is rendered by Blazor inside the BlazorWebView, so MAUI-level
+                 styling is minimal. This just sets the page background behind the web view
+                 (referenced by MainPage.xaml) to avoid a coloured flash on launch. -->
+            <Color x:Key="PageBackgroundColor">White</Color>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
