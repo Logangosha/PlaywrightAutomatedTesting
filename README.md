@@ -8,10 +8,14 @@ traces, and logs — no file-system spelunking.
 
 Windows only. On a blank machine:
 
-1. **Clone this repo** anywhere.
-2. **Double-click `setup.bat`.** One time — it installs the .NET 8 SDK (if missing),
-   builds, installs the browser, adds a **Playwright Automation Tool** desktop
-   shortcut, and opens the app when it's done.
+1. **Get the repo** — clone it, or download the ZIP and extract it. **Put it in a short
+   folder path** like `C:\PAT` or `C:\dev\`, *not* a deep `Downloads\…\…` path: MAUI
+   builds create very long nested paths and can hit Windows' 260-character limit.
+2. **Double-click `setup.bat`.** One time — it installs the .NET 8 SDK + MAUI workload
+   (if missing), builds, installs the browser, adds a **Playwright Automation Tool**
+   desktop shortcut, and opens the app when it's done. If Windows SmartScreen warns
+   ("Windows protected your PC"), choose **More info → Run anyway** — the scripts aren't
+   code-signed.
 3. **Next time, use that shortcut** (or `launch.bat`).
 
 **What `setup.bat` installs** (all one-time, all automatic):
@@ -19,9 +23,15 @@ Windows only. On a blank machine:
 | Component | Why | Notes |
 |---|---|---|
 | .NET 8 SDK | build + run tests | via winget if missing |
+| .NET MAUI workload | the desktop UI is a MAUI app | a fresh SDK has none; large download |
 | WebView2 runtime | the UI renders in it | preinstalled on modern Windows |
 | Playwright **Chromium** | tests drive a real browser | the ~150 MB browser binaries |
 | NuGet packages | Playwright .NET lib, xUnit, … | restored on build — no separate step |
+
+Installing the SDK and the MAUI workload requires admin, so `setup.bat` will prompt for
+elevation (UAC) **only if** one of them is missing; if everything's already present it
+runs without a prompt. The MAUI workload is a sizeable download on a blank machine — the
+first setup can take several minutes.
 
 Note the two halves of Playwright: the **.NET library** is a NuGet package restored
 automatically on build; the **browser binaries** are a separate one-time download that

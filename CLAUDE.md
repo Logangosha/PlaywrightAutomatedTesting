@@ -71,8 +71,12 @@ Three scripts under `scripts/` (plus `setup.bat`/`launch.bat` wrappers at the re
 drive install → open → author:
 
 - `scripts/setup.ps1` (`setup.bat`) — one-time, idempotent: installs the .NET 8 SDK and
-  WebView2 runtime via winget if missing, builds, installs Playwright Chromium, points a
-  desktop shortcut at the silent launch path (below), then opens the app itself.
+  WebView2 runtime via winget if missing, installs the **.NET MAUI workload** (a fresh
+  SDK ships with none — `dotnet workload restore` on the UI csproj; the build fails
+  otherwise, e.g. NETSDK1147 demanding `maui-tizen`), builds, installs Playwright
+  Chromium, points a desktop shortcut at the silent launch path (below), then opens the
+  app itself. Installing the SDK/workload needs admin, so it self-elevates (one UAC
+  prompt) *only* when one of those is missing.
 - `scripts/rebuild.ps1` — the one build-and-launch engine, used two ways distinguished by
   `-WaitForPid`: opening the app builds first (so tests are always current) then
   launches; the in-app "Restart & rebuild" banner passes the app's own process id so the
