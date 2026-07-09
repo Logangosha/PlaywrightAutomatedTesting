@@ -185,6 +185,8 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline
     font-size: 13px;
     font-weight: 600;
     color: var(--text-primary);
+    white-space: normal;   /* allow the full name to wrap in the narrow sidebar */
+    line-height: 1.25;
 }
 
 .collapse-btn {
@@ -230,12 +232,34 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline
 .shell.collapsed .side-top { justify-content: center; padding: 2px 0 12px; }
 .shell.collapsed .nav-item { justify-content: center; padding: 8px; gap: 0; }
 
+.main {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
 .content {
     flex: 1 1 auto;
     overflow: auto;
     padding: 28px 32px;
     min-width: 0;
 }
+
+/* App-wide "tests changed" banner (author loop) */
+.rebuild-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--text-primary);
+    background: var(--bg-accent);
+    border-bottom: 0.5px solid var(--border);
+}
+.rebuild-banner .spacer { flex: 1; }
+.rebuild-banner.danger { background: var(--bg-danger); color: var(--text-danger); }
+.btn-primary.sm { height: 28px; padding: 0 12px; font-size: 12px; }
 
 /* --- Status indicator helpers (the only place red/green appear) --- */
 .status-pass { color: var(--text-success); }

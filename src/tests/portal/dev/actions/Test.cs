@@ -7,14 +7,14 @@ namespace PlaywrightAutomatedTesting.Portal.Dev.Actions
     [Trait("Env", "dev")]
     [Trait("Env", "prod")]
     [Trait("Kind", "Action")]
-    [Trait("Module", "MemberManagement")]
-    public class MemberSearchTests : TestBase
+    [Trait("Module", "Test")]
+    public class Test : TestBase
     {
-        public MemberSearchTests(ITestOutputHelper output) : base(output) { }
+        public Test(ITestOutputHelper output) : base(output) { }
 
         [Fact]
         [Trait("Category", "Smoke")]
-        public async Task MemberSearch_SearchExistingMember_DisplaysMatchingMember()
+        public async Task Test_Test()
         {
             // --- ARRANGE ---
             var baseUrl = TestSettings.BaseUrl;

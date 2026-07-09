@@ -66,6 +66,25 @@ Traits route; folders only organize. A multi-env test lives in its *home* env's 
 No runner changes needed — routing is entirely trait-driven. Confirm the runner sees
 your tests with `dotnet run -- discover`.
 
+## Applying your changes (rebuild)
+
+Tests are **compiled**, and the UI loads the test assembly at startup — so a new or
+edited test only shows up after a **rebuild**. This is handled for you in two spots:
+
+- **When you open the app:** launch it via **`launch.bat`** (or the desktop shortcut,
+  which points at it). It **builds first, then launches**, so whatever you changed
+  while the app was closed — added, edited, or deleted tests — is always current on
+  open. (A clean build is quick; you only wait longer when something actually changed.
+  If the build fails, it shows the errors and offers to launch your previous build.)
+- **While the app is open:** editing anything under `src/tests` raises a banner —
+  *"Tests changed — rebuild and restart to apply."* Click **Restart & rebuild**; the
+  app closes, rebuilds, and relaunches (it can't rebuild itself while running because
+  it holds the assembly locked).
+
+Authoring from the **console** picks up changes automatically too — each
+`dotnet run` / `dotnet test` is a fresh process that builds first. (Launching the raw
+`RunnerUI.exe` directly is the one path that skips the build — use `launch.bat`.)
+
 ## Writing an Auth (login) test
 
 The one test auto mode runs to establish a session, selected via

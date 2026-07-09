@@ -55,6 +55,52 @@ Design docs: `diagrams/sequence.md`, `diagrams/state-chart.md`,
 `diagrams/components.md` — illustrative; where a diagram and the code disagree,
 the code is authoritative.
 
+## UI (RunnerUI)
+
+`ui/RunnerUI` is a .NET MAUI Blazor Hybrid desktop frontend (Windows-only, unpackaged +
+self-contained — see its csproj comments for why) — a second frontend next to
+`Program.cs`. `RunnerHost` (`ui/RunnerUI/Services`) builds an in-memory `Config`, writes
+it to a temp file, and drives the same `Runner`/`IAuth`/`IDiscovery` the console uses —
+no run logic is duplicated. `MauiProgram.cs` is its composition root (DI registrations)
+and also calls `Paths.SetProjectRoot` to point at the repo root, since the UI's own base
+directory isn't `bin/Debug/net8.0` like the console's default heuristic assumes.
+
+## Setup, launch, and the build/watch lifecycle
+
+Three scripts under `scripts/` (plus `setup.bat`/`launch.bat` wrappers at the repo root)
+drive install → open → author:
+
+- `scripts/setup.ps1` (`setup.bat`) — one-time, idempotent: installs the .NET 8 SDK and
+  WebView2 runtime via winget if missing, builds, installs Playwright Chromium, points a
+  desktop shortcut at the silent launch path (below), then opens the app itself.
+- `scripts/rebuild.ps1` — the one build-and-launch engine, used two ways distinguished by
+  `-WaitForPid`: opening the app builds first (so tests are always current) then
+  launches; the in-app "Restart & rebuild" banner passes the app's own process id so the
+  script waits for it to exit (unlocking the test DLL) before rebuilding and relaunching.
+- `scripts/launch-hidden.vbs` — runs `rebuild.ps1` via `WScript.Shell.Run` with window
+  style 0, so opening the app (`launch.bat`, or the desktop shortcut which targets
+  `wscript.exe` + this file directly) never flashes a console.
+
+Opening the app **always rebuilds first** — there is no startup staleness heuristic; the
+build is authoritative and (incremental) fast. Two failure surfaces, both in
+`ui/RunnerUI/Services`:
+
+- **Build fails while opening silently** — `rebuild.ps1` writes the output to
+  `logs/build-error.log` (gitignored; cleared at the start of every attempt) and still
+  launches the *previous* good `RunnerUI.exe` (newest one found under
+  `ui/RunnerUI/bin`). `BuildStatus` reads that file on startup; `MainLayout.razor` shows
+  a red banner instead of a silent, unexplained old build. The one case with no previous
+  build to fall back to pops a native `MessageBox` — nothing else can show it.
+- **Tests change while the app is running** — `TestsWatcher` (a debounced
+  `FileSystemWatcher` on `src/tests/*.cs`) raises an event; `MainLayout.razor`'s banner
+  **Restart & rebuild** button (`AppRestarter`) hands off to `rebuild.ps1 -WaitForPid
+  <own pid>` in a **visible** console (a deliberate click, unlike the silent open path)
+  and exits.
+
+**The app can never rebuild itself** — it holds the test assembly loaded (locked), so
+every rebuild path is an external script that either runs before the app opens or waits
+for it to close, rather than the app invoking `dotnet build` in-process.
+
 ## Key invariants
 
 - Test failures are **results**, not faults — `RunningActions → Reporting` happens on pass or fail. `Faulted` means the runner itself broke (bad config, unreachable env, failed login, unreadable results).

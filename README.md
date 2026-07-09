@@ -1,17 +1,62 @@
-Run with dotnet run --project ui/RunnerUI/RunnerUI.csproj -f net8.0-windows10.0.19041.0
-
 # Playwright Automated Testing
 
-A config-driven Playwright test runner for .NET. You hand the runner a config
-file — it verifies the environment is reachable, authenticates, runs the
-selected actions (xUnit + Playwright tests), and reports the results. **The
-config is the only thing you ever edit to run tests.**
+A desktop app + config-driven runner for Playwright tests on .NET. Pick a site,
+environment, and tests in the UI; it authenticates, runs them, and shows the results,
+traces, and logs — no file-system spelunking.
 
-New to the repo? This page gets you running and pointed in the right direction.
-Working *on* the runner itself? Start with [CLAUDE.md](CLAUDE.md) and
-[diagrams/](diagrams/) for the architecture.
+## Getting started (new machine)
 
-## Prerequisites
+Windows only. On a blank machine:
+
+1. **Clone this repo** anywhere.
+2. **Double-click `setup.bat`.** One time — it installs the .NET 8 SDK (if missing),
+   builds, installs the browser, adds a **Playwright Automation Tool** desktop
+   shortcut, and opens the app when it's done.
+3. **Next time, use that shortcut** (or `launch.bat`).
+
+**What `setup.bat` installs** (all one-time, all automatic):
+
+| Component | Why | Notes |
+|---|---|---|
+| .NET 8 SDK | build + run tests | via winget if missing |
+| WebView2 runtime | the UI renders in it | preinstalled on modern Windows |
+| Playwright **Chromium** | tests drive a real browser | the ~150 MB browser binaries |
+| NuGet packages | Playwright .NET lib, xUnit, … | restored on build — no separate step |
+
+Note the two halves of Playwright: the **.NET library** is a NuGet package restored
+automatically on build; the **browser binaries** are a separate one-time download that
+`setup.bat` installs. The Windows App SDK the UI needs is bundled into the app, so
+there's nothing to install for it.
+
+### What happens every time you open the app
+
+The shortcut doesn't just launch the app — **it builds first, silently, every time**,
+so the tests you see are always the ones currently on disk. No console window appears;
+you just see the app open a few seconds later (an unchanged build takes a couple of
+seconds, a real rebuild a bit longer). If that build fails, the app still opens — using
+the last one that worked — and shows a banner explaining the previous build failed,
+with a link to the error log, instead of silently running stale tests.
+
+### What happens while the app is open
+
+Editing anything under `src/tests` while the app is running shows a banner —
+*"Tests changed — rebuild and restart to apply."* Tests are compiled, so a change only
+takes effect after a rebuild, and the app can't rebuild itself while it's running (it
+has the test assembly open). Click **Restart & rebuild** and it closes, rebuilds, and
+reopens for you. See [src/tests/README.md](src/tests/README.md) for the full authoring
+guide, including the manual fallback.
+
+- **Add or edit tests:** see [src/tests/README.md](src/tests/README.md).
+- **Work on the runner/UI internals:** see [CLAUDE.md](CLAUDE.md) and [diagrams/](diagrams/).
+
+---
+
+The rest of this page documents the **console runner** (the same engine the UI drives),
+useful for scripting, CI, or debugging a single run.
+
+## Prerequisites (console / manual)
+
+`setup.bat` does all of this for you; do it by hand only if you prefer the console:
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - Playwright browsers (one-time install, after the first build):
@@ -25,7 +70,7 @@ pwsh bin/Debug/net8.0/playwright.ps1 install chromium
 > installing just `chromium` is enough. If you skip this step, tests fail with
 > "Executable doesn't exist" — see [Troubleshooting](#troubleshooting).
 
-## Quick start
+## Quick start (console)
 
 From the repo root (the config path is resolved relative to where you run):
 

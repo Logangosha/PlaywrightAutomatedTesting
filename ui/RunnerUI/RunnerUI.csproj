@@ -21,7 +21,7 @@
         <RuntimeIdentifier Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">win10-x64</RuntimeIdentifier>
 
         <!-- Display name -->
-        <ApplicationTitle>RunnerUI</ApplicationTitle>
+        <ApplicationTitle>Playwright Automation Tool</ApplicationTitle>
 
         <!-- App Identifier -->
         <ApplicationId>com.companyname.runnerui</ApplicationId>
@@ -35,8 +35,14 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- App Icon -->
-        <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+        <!-- App Icon (single full-bleed image; it already has its own dark background) -->
+        <MauiIcon Include="Resources\AppIcon\appicon.png" />
+
+        <!-- Unpackaged Windows apps set their taskbar/titlebar icon at runtime from a
+             real .ico (MauiIcon above only feeds packaged-app manifest icons), so also
+             ship appicon.ico flattened to the output root — see App.xaml.cs. Regenerate
+             it with scripts\make-icon.ps1 if appicon.png changes. -->
+        <None Include="Resources\AppIcon\appicon.ico" CopyToOutputDirectory="PreserveNewest" Link="appicon.ico" />
 
         <!-- Splash Screen -->
         <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />

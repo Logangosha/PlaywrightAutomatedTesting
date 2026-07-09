@@ -1,5 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
 using RunnerUI.Services;
+#if WINDOWS
+using Microsoft.Maui.LifecycleEvents;
+using Microsoft.UI;
+using Microsoft.UI.Windowing;
+#endif
 
 namespace RunnerUI;
 
@@ -23,12 +28,33 @@ public static class MauiProgram
 
 		builder.Services.AddMauiBlazorWebView();
 
+#if WINDOWS
+		// Unpackaged Windows apps don't pick up the taskbar/titlebar icon from the
+		// MauiIcon manifest entry — set it at runtime from the .ico shipped alongside
+		// the exe (see the csproj: appicon.ico is copied to the output root).
+		builder.ConfigureLifecycleEvents(events =>
+		{
+			events.AddWindows(windows => windows.OnWindowCreated(window =>
+			{
+				var iconPath = Path.Combine(AppContext.BaseDirectory, "appicon.ico");
+				if (!File.Exists(iconPath)) return;
+
+				var handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
+				var id = Win32Interop.GetWindowIdFromWindow(handle);
+				AppWindow.GetFromWindowId(id).SetIcon(iconPath);
+			}));
+		});
+#endif
+
 		// The "remote control" seam: register the runner's backend + the host that
 		// drives it, so Blazor pages can use them via DI.
 		builder.Services.AddSingleton<IDiscovery, Discovery>();
 		builder.Services.AddSingleton<RunnerHost>();
 		builder.Services.AddSingleton<ArtifactOpener>();
 		builder.Services.AddSingleton<RunHistory>();
+		builder.Services.AddSingleton<TestsWatcher>();
+		builder.Services.AddSingleton<AppRestarter>();
+		builder.Services.AddSingleton<BuildStatus>();
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
