@@ -1,3 +1,5 @@
+Run with dotnet run --project ui/RunnerUI/RunnerUI.csproj -f net8.0-windows10.0.19041.0
+
 # Playwright Automated Testing
 
 A config-driven Playwright test runner for .NET. You hand the runner a config

@@ -1,0 +1,132 @@
+@page "/history"
+@inject RunHistory Runs
+@inject ArtifactOpener Artifacts
+
+@* Past runs read off disk (results/ + traces/). Open a run's log or an individual
+   trace, or delete old runs — without leaving the app for the file system. *@
+
+<div class="page-head">
+    <h1>History</h1>
+    @if (_runs.Count > 0)
+    {
+        @if (_confirmingClear)
+        {
+            <span class="clear-confirm">
+                Delete all @_runs.Count runs?
+                <button class="btn-ghost danger" @onclick="ClearAll">Yes, clear all</button>
+                <button class="btn-ghost" @onclick="() => _confirmingClear = false">Cancel</button>
+            </span>
+        }
+        else
+        {
+            <button class="btn-ghost" @onclick="() => _confirmingClear = true">Clear all</button>
+        }
+    }
+</div>
+<p class="muted">Past runs — open their logs and traces, or remove old ones.</p>
+
+@if (_artifactMsg is not null)
+{
+    <div class="muted small">@_artifactMsg</div>
+}
+
+@if (_runs.Count == 0)
+{
+    <p class="muted">No runs yet. Runs you launch from New run will show up here.</p>
+}
+else
+{
+    <div class="run-list">
+        @foreach (var run in _runs)
+        {
+            <details class="run-row">
+                <summary>
+                    <span class="run-when">@When(run)</span>
+                    @if (run.Total > 0)
+                    {
+                        <span class="run-counts">
+                            @run.Total tests ·
+                            <span class="status-pass">@run.Passed passed</span> ·
+                            <span class="status-fail">@run.Failed failed</span>
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="run-counts muted">no test results</span>
+                    }
+                    <span class="spacer"></span>
+                    @if (run.LogPath is not null)
+                    {
+                        <button class="link-btn" @onclick="() => Open(run.LogPath!)" @onclick:preventDefault @onclick:stopPropagation>Log</button>
+                    }
+                    <button class="link-btn danger" @onclick="() => Delete(run.Timestamp)" @onclick:preventDefault @onclick:stopPropagation>Delete</button>
+                </summary>
+
+                <div class="run-traces">
+                    @{ var traces = TracesFor(run); }
+                    @if (traces.Count == 0)
+                    {
+                        <span class="muted small">No traces for this run.</span>
+                    }
+                    else
+                    {
+                        @foreach (var t in traces)
+                        {
+                            <button class="trace-item" @onclick="() => OpenTrace(t.FullPath)">
+                                <span class="ti-ico">▸</span>@t.Relative
+                            </button>
+                        }
+                    }
+                </div>
+            </details>
+        }
+    </div>
+}
+
+@code {
+    private IReadOnlyList<RunRecord> _runs = Array.Empty<RunRecord>();
+    private bool _confirmingClear;
+    private string? _artifactMsg;
+
+    protected override void OnInitialized() => Reload();
+
+    private void Reload()
+    {
+        _runs = Runs.List();
+        _confirmingClear = false;
+    }
+
+    private IReadOnlyList<(string Relative, string FullPath)> TracesFor(RunRecord run) =>
+        Artifacts.ListTraces(run.TracesDir);
+
+    private static string When(RunRecord run) =>
+        run.When?.ToString("yyyy-MM-dd  HH:mm:ss") ?? run.Timestamp;
+
+    private void Open(string path)
+    {
+        try { Artifacts.OpenPath(path); _artifactMsg = null; }
+        catch (Exception ex) { _artifactMsg = ex.Message; }
+    }
+
+    private void OpenTrace(string zipPath)
+    {
+        try
+        {
+            Artifacts.OpenTrace(zipPath);
+            _artifactMsg = "Opening the Playwright trace viewer… it can take a few seconds and may appear behind this window.";
+        }
+        catch (Exception ex) { _artifactMsg = $"Couldn't open the trace viewer: {ex.Message}"; }
+    }
+
+    private void Delete(string timestamp)
+    {
+        Runs.Delete(timestamp);
+        Reload();
+    }
+
+    private void ClearAll()
+    {
+        Runs.Clear();
+        Reload();
+    }
+}

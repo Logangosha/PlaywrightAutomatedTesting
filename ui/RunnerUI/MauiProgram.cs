@@ -28,6 +28,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IDiscovery, Discovery>();
 		builder.Services.AddSingleton<RunnerHost>();
 		builder.Services.AddSingleton<ArtifactOpener>();
+		builder.Services.AddSingleton<RunHistory>();
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
