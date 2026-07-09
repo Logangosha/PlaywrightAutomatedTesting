@@ -13,10 +13,18 @@ public class RunnerHost
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     /// <param name="input">The form values for this run.</param>
-    /// <param name="onStatus">Optional per-phase status line (used by the live view in M3).</param>
-    public async Task<RunResult> RunAsync(RunInput input, Action<string>? onStatus = null)
+    /// <param name="onStatus">Optional per-phase status line (used by the live view).</param>
+    /// <param name="waitForUser">
+    /// Manual-auth callback: invoked with a prompt after the headed login browser opens,
+    /// and must complete once the user confirms they've logged in. Required for
+    /// auth.mode = manual; ignored otherwise.
+    /// </param>
+    public async Task<RunResult> RunAsync(
+        RunInput input,
+        Action<string>? onStatus = null,
+        Func<string, Task>? waitForUser = null)
     {
-        // Build the config the runner understands. M2 is auth = none.
+        // Build the config the runner understands, including the chosen auth.
         var config = new Config
         {
             Site = input.Site.Trim(),
@@ -24,7 +32,12 @@ public class RunnerHost
             Url = input.Url.Trim(),
             Actions = string.IsNullOrWhiteSpace(input.Actions) ? "all" : input.Actions.Trim(),
             Headless = input.Headless,
-            Auth = new AuthConfig { Mode = "none" }
+            Auth = new AuthConfig
+            {
+                Mode = input.AuthMode,
+                Username = input.Username,
+                Password = input.Password
+            }
         };
 
         // The runner loads configs from a path (and validates on load), so write the
@@ -36,7 +49,7 @@ public class RunnerHost
         {
             var runner = new Runner(
                 loadConfig: Config.Load,
-                auth: new Auth(),                    // no waitForUser — M2 is auth = none
+                auth: new Auth(waitForUser),         // used only in manual mode
                 actions: new Actions(),
                 results: new NullResults(),          // we use the returned RunResult, not a presenter
                 onStatus: onStatus ?? (_ => { }));
@@ -58,4 +71,7 @@ public class RunInput
     public string Url { get; set; } = "";
     public string Actions { get; set; } = "all";
     public bool Headless { get; set; } = true;
+    public string AuthMode { get; set; } = "none";   // none | manual | auto
+    public string? Username { get; set; }
+    public string? Password { get; set; }
 }

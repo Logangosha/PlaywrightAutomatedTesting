@@ -51,6 +51,48 @@
         </div>
 
         <div class="field">
+            <label>Auth</label>
+            <select @bind="_authMode">
+                <option value="none">None — start logged out</option>
+                <option value="manual">Manual — log in yourself</option>
+                <option value="auto">Auto — use credentials</option>
+            </select>
+
+            @if (_authMode == "auto")
+            {
+                <div class="row" style="margin-top:8px;">
+                    <div class="field">
+                        <label>Username</label>
+                        <input @bind="_username" />
+                    </div>
+                    <div class="field">
+                        <label>Password</label>
+                        <input type="password" @bind="_password" />
+                    </div>
+                </div>
+                @if (_env.Length > 0)
+                {
+                    @if (AuthTests.Count == 1)
+                    {
+                        <span class="hint">Login test: <code>@AuthTests[0].Method</code></span>
+                    }
+                    else if (AuthTests.Count == 0)
+                    {
+                        <span class="hint warn">No login test found for @_site / @_env — auto auth will fault.</span>
+                    }
+                    else
+                    {
+                        <span class="hint warn">@AuthTests.Count login tests match @_site / @_env — exactly one is required.</span>
+                    }
+                }
+            }
+            else if (_authMode == "manual")
+            {
+                <span class="hint">A browser opens at the URL; log in there, then confirm in the app. The session is reused by the tests.</span>
+            }
+        </div>
+
+        <div class="field">
             <label>Tests to run</label>
 
             @if (_env.Length == 0)
@@ -128,8 +170,6 @@
             Headless
         </label>
 
-        <div class="note">Auth is <strong>none</strong> for now (auto/manual come in a later step).</div>
-
         @if (_error is not null)
         {
             <div class="error-box">@_error</div>
@@ -153,6 +193,15 @@ else if (_step == Step.Running)
                 </span>
             }
         </div>
+
+        @if (_loginPrompt is not null)
+        {
+            <div class="login-prompt">
+                <div class="lp-title">Waiting for you to log in</div>
+                <div class="muted">@_loginPrompt</div>
+                <button class="btn-primary" @onclick="ConfirmLogin">I've logged in</button>
+            </div>
+        }
 
         <div class="run-status">
             <div class="spinner"></div>
@@ -290,6 +339,16 @@ else if (_step == Step.Results && _result is not null)
     private string _url = "";
     private bool _headless = true;
 
+    private string _authMode = "none";
+    private string? _username;
+    private string? _password;
+
+    // Manual-auth pause: WaitForUser sets a prompt + a TCS the runner awaits; the
+    // "I've logged in" button completes it. RunContinuationsAsynchronously keeps the
+    // runner's continuation off the UI click handler.
+    private string? _loginPrompt;
+    private TaskCompletionSource<bool>? _loginTcs;
+
     private bool _allTests;
     private readonly HashSet<string> _categories = new();
     private readonly HashSet<string> _modules = new();       // whole-module picks (Module=)
@@ -333,6 +392,10 @@ else if (_step == Step.Results && _result is not null)
 
     private IEnumerable<DiscoveredTest> ScopedActionTests =>
         _all.Where(t => t.Site == _site && t.Envs.Contains(_env) && t.Kind != "Auth");
+
+    // Login tests matching the chosen Site+Env — auto auth needs exactly one.
+    private List<DiscoveredTest> AuthTests =>
+        _all.Where(t => t.Kind == "Auth" && t.Site == _site && t.Envs.Contains(_env)).ToList();
 
     private List<string> Categories =>
         ScopedActionTests.Where(t => t.Category is not null)
@@ -405,14 +468,37 @@ else if (_step == Step.Results && _result is not null)
 
     private bool HasSelection => _allTests || _modules.Count > 0 || _categories.Count > 0 || _tests.Count > 0;
 
+    // Auto needs credentials and exactly one matching login test; manual/none are always OK.
+    private bool AuthOk => _authMode switch
+    {
+        "auto" => !string.IsNullOrWhiteSpace(_username) && !string.IsNullOrWhiteSpace(_password) && AuthTests.Count == 1,
+        _ => true
+    };
+
     private bool CanRun =>
-        _site.Length > 0 && _env.Length > 0 && _url.Trim().Length > 0 && HasSelection;
+        _site.Length > 0 && _env.Length > 0 && _url.Trim().Length > 0 && HasSelection && AuthOk;
+
+    private Task WaitForUser(string message)
+    {
+        _loginTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _loginPrompt = message;
+        InvokeAsync(StateHasChanged);
+        return _loginTcs.Task;
+    }
+
+    private void ConfirmLogin()
+    {
+        _loginPrompt = null;
+        _loginTcs?.TrySetResult(true);
+    }
 
     private async Task StartRun()
     {
         _error = null;
         _lastStatus = null;
         _phase = null;
+        _loginPrompt = null;
+        _loginTcs = null;
         _live.Clear();
         _step = Step.Running;
         StateHasChanged();
@@ -423,12 +509,15 @@ else if (_step == Step.Results && _result is not null)
             Env = _env,
             Url = _url,
             Actions = ComposeActions(),
-            Headless = _headless
+            Headless = _headless,
+            AuthMode = _authMode,
+            Username = _username,
+            Password = _password
         };
 
         try
         {
-            _result = await Runner.RunAsync(input, OnStatus);
+            _result = await Runner.RunAsync(input, OnStatus, WaitForUser);
             _step = Step.Results;
         }
         catch (Exception ex)
@@ -487,6 +576,8 @@ else if (_step == Step.Results && _result is not null)
         _error = null;
         _artifactMsg = null;
         _showTracePicker = false;
+        _loginPrompt = null;
+        _loginTcs = null;
         _step = Step.Configure;
     }
 

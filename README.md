@@ -235,85 +235,18 @@ Rules of the road:
 The live examples under [src/tests/portal/dev](src/tests/portal/dev) follow all
 of these — copy them when starting a new site.
 
-## Writing an auth test
+## Writing tests
 
-Auto mode runs exactly **one** login test per `site`+`env` — zero matches or
-more than one both fault the run. Write one that:
+The full guide — how to structure auth and action tests, the trait rules, the
+"add a new site" recipe, and copy-paste patterns for the common edge cases (cookie
+banners, two-step logins, dynamic content, negative assertions, native dialogs,
+data-driven `[Theory]`) — lives in **[src/tests/README.md](src/tests/README.md)**.
 
-- extends [TestBase](src/tests/TestBase.cs),
-- is tagged `Site`, `Env`, and `Kind=Auth` (no `Category`/`Module` — auth doesn't use them),
-- reads credentials from `TestSettings.LoginUsername` / `TestSettings.LoginPassword`
-  (the runner supplies these from the config — never hardcode them),
-- drives the site's login UI and **asserts** it worked.
-
-`TestBase` saves the session automatically. Because it's a real test with an assertion,
-a wrong password fails the assertion → the run **faults and tells you**, instead of
-quietly running actions with a broken session.
-
-```csharp
-[Trait("Site", "acme")]
-[Trait("Env", "prod")]
-[Trait("Kind", "Auth")]
-public class AcmeProdLogin : TestBase
-{
-    public AcmeProdLogin(ITestOutputHelper output) : base(output) { }
-
-    [Fact]
-    public async Task Login_Succeeds()
-    {
-        await Page.GotoAsync(TestSettings.BaseUrl);
-
-        await Page.Locator("#email").FillAsync(TestSettings.LoginUsername);
-        await Page.Locator("#password").FillAsync(TestSettings.LoginPassword);
-        await Page.Locator("button[type=submit]").ClickAsync();
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-        // Assert something only true once logged in.
-        Assert.False(await Page.Locator("#password").IsVisibleAsync(),
-            "Login failed — still on the login form.");
-        // TestBase saves the session on cleanup.
-    }
-}
-```
-
-A working reference lives at
-[PortalDevLogin.cs](src/tests/portal/dev/auth/PortalDevLogin.cs).
-
-## Writing an action test
-
-Action tests are the real work. Write ones that:
-
-- extend [TestBase](src/tests/TestBase.cs) (browser, tracing, and session reuse are handled),
-- are tagged `Site`, `Env`, `Kind=Action`, plus `Category` and `Module`,
-- navigate using `TestSettings.BaseUrl` (the `url` from the config).
-
-The session the auth step saved is reused automatically, so the test starts logged in.
-
-```csharp
-[Trait("Site", "acme")]
-[Trait("Env", "prod")]
-[Trait("Kind", "Action")]
-[Trait("Module", "HomePage")]
-public class AcmeHomePageTests : TestBase
-{
-    public AcmeHomePageTests(ITestOutputHelper output) : base(output) { }
-
-    [Fact]
-    [Trait("Category", "Smoke")]
-    public async Task HomePage_AfterLogin_ShowsWelcome()
-    {
-        await Page.GotoAsync(TestSettings.BaseUrl, new() { WaitUntil = WaitUntilState.NetworkIdle });
-
-        var welcome = Page.GetByRole(AriaRole.Heading, new() { Name = "Welcome" });
-        await welcome.WaitForAsync();
-
-        Assert.True(await welcome.IsVisibleAsync());
-    }
-}
-```
-
-A working reference lives at
-[HomePageTests.cs](src/tests/portal/dev/actions/HomePageTests.cs).
+In short: every test extends [TestBase](src/tests/TestBase.cs), reads config from
+`TestSettings`, and is tagged with `[Trait]`s (`Site`/`Env`/`Kind`, plus
+`Category`/`Module` for actions). Auto mode runs the one `Kind=Auth` login test per
+site+env; `Kind=Action` tests start already logged in. The live examples under
+[src/tests/portal/dev](src/tests/portal/dev) follow every convention — copy them.
 
 ## Running tests without the runner
 

@@ -20,6 +20,13 @@ public class Auth : IAuth
 
     public async Task<string?> AuthenticateAsync(IConfig config, string timestamp, Action<string>? onProgress = null)
     {
+        // Start from a clean session: remove any storageState.json a previous run saved.
+        // Without this, a run whose auth doesn't establish a valid session — auth=none, or
+        // an auto/manual login that fails — could silently reuse a stale session left on
+        // disk. It also makes AutoLoginAsync's "did the login save a session?" check
+        // (File.Exists below) meaningful rather than satisfied by a leftover file.
+        ClearPreviousSession();
+
         return config.Auth.Mode.ToLowerInvariant() switch
         {
             "none" => null,
@@ -27,6 +34,16 @@ public class Auth : IAuth
             "auto" => await AutoLoginAsync(config, timestamp, onProgress),
             _ => throw new Exception($"Unknown auth mode '{config.Auth.Mode}'.")
         };
+    }
+
+    private static void ClearPreviousSession()
+    {
+        try
+        {
+            if (File.Exists(Paths.StorageStatePath))
+                File.Delete(Paths.StorageStatePath);
+        }
+        catch { /* best-effort; a later save overwrites it anyway */ }
     }
 
     private async Task<string> ManualLoginAsync(IConfig config)

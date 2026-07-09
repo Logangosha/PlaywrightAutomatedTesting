@@ -270,6 +270,7 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline
 .field select:disabled { color: var(--text-muted); background: var(--surface-1); }
 .field .hint { font-size: 11px; color: var(--text-muted); }
 .field .hint code { font-size: 11px; }
+.field .hint.warn { color: var(--text-danger); }
 
 .chk { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
 .all-toggle { padding: 4px 0 2px; }
@@ -337,6 +338,13 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline
 .phase.active .pdot { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .phase.done { color: var(--text-secondary); }
 .phase.done .pdot { background: var(--bg-accent); color: var(--text-secondary); }
+
+.login-prompt {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+    padding: 16px; border-radius: var(--radius);
+    border: 0.5px solid var(--border-strong); background: var(--surface-1);
+}
+.login-prompt .lp-title { font-size: 14px; font-weight: 600; }
 
 .run-status { display: flex; align-items: center; gap: 10px; }
 .spinner {
