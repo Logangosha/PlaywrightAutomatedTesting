@@ -380,7 +380,7 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* --- Result --- */
-.result { display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
+.result { display: flex; flex-direction: column; gap: 14px; max-width: 960px; }
 .verdict { font-size: 18px; font-weight: 600; }
 .verdict.v-pass { color: var(--text-success); }
 .verdict.v-fail, .verdict.v-fault { color: var(--text-danger); }
@@ -395,7 +395,7 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline
     cursor: pointer; list-style: none;
 }
 .res-test > summary::-webkit-details-marker { display: none; }
-.test-name { flex: 1; font-family: var(--font-mono); font-size: 12px; }
+.test-name { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px; word-break: break-word; overflow-wrap: anywhere; }
 .err {
     margin: 0; padding: 10px 12px 12px 34px;
     font-family: var(--font-mono); font-size: 11px; line-height: 1.5;
