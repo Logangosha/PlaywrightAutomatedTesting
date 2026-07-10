@@ -25,23 +25,14 @@
         <div class="row">
             <div class="field">
                 <label>Site</label>
-                <select @bind="_site" @bind:after="OnSiteChanged">
-                    <option value="">Select a site…</option>
-                    @foreach (var s in Sites)
-                    {
-                        <option value="@s">@s</option>
-                    }
-                </select>
+                <SelectMenu @bind-Value="_site" @bind-Value:after="OnSiteChanged"
+                            Placeholder="Select a site…" Options="SiteOptions" />
             </div>
             <div class="field">
                 <label>Env</label>
-                <select @bind="_env" @bind:after="OnEnvChanged" disabled="@(_site.Length == 0)">
-                    <option value="">Select an environment…</option>
-                    @foreach (var e in EnvsForSite)
-                    {
-                        <option value="@e">@e</option>
-                    }
-                </select>
+                <SelectMenu @bind-Value="_env" @bind-Value:after="OnEnvChanged"
+                            Disabled="@(_site.Length == 0)"
+                            Placeholder="Select an environment…" Options="EnvOptions" />
             </div>
         </div>
 
@@ -52,11 +43,7 @@
 
         <div class="field">
             <label>Auth</label>
-            <select @bind="_authMode">
-                <option value="none">None — start logged out</option>
-                <option value="manual">Manual — log in yourself</option>
-                <option value="auto">Auto — use credentials</option>
-            </select>
+            <SelectMenu @bind-Value="_authMode" Options="AuthOptions" />
 
             @if (_authMode == "auto")
             {
@@ -389,6 +376,20 @@ else if (_step == Step.Results && _result is not null)
     private List<string> EnvsForSite =>
         _all.Where(t => t.Site == _site)
             .SelectMany(t => t.Envs).Distinct().OrderBy(e => e).ToList();
+
+    // Dropdown option lists for the SelectMenu components.
+    private List<SelectMenu.Option> SiteOptions =>
+        Sites.Select(s => new SelectMenu.Option(s, s)).ToList();
+
+    private List<SelectMenu.Option> EnvOptions =>
+        EnvsForSite.Select(e => new SelectMenu.Option(e, e)).ToList();
+
+    private static readonly List<SelectMenu.Option> AuthOptions = new()
+    {
+        new("none", "None — start logged out"),
+        new("manual", "Manual — log in yourself"),
+        new("auto", "Auto — use credentials"),
+    };
 
     private IEnumerable<DiscoveredTest> ScopedActionTests =>
         _all.Where(t => t.Site == _site && t.Envs.Contains(_env) && t.Kind != "Auth");

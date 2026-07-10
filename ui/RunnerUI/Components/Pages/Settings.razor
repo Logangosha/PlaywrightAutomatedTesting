@@ -9,16 +9,19 @@
 
 <div class="field" style="max-width: 260px;">
     <label>Theme</label>
-    <select @bind="_theme" @bind:after="ApplyTheme">
-        <option value="system">System (default)</option>
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-    </select>
+    <SelectMenu @bind-Value="_theme" @bind-Value:after="ApplyTheme" Options="ThemeOptions" />
     <span class="hint">Overrides your OS light/dark setting for this app.</span>
 </div>
 
 @code {
     private string _theme = "system";
+
+    private static readonly List<SelectMenu.Option> ThemeOptions = new()
+    {
+        new("system", "System (default)"),
+        new("light", "Light"),
+        new("dark", "Dark"),
+    };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
