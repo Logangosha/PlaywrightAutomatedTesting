@@ -28,6 +28,8 @@ RunnerUI/
 │  ├─ Pages/              Routable screens (one @page each). The run workflow —
 │  │                      pre-run, live-run, post-run — is built out here.
 │  │                      Home.razor
+│  ├─ Shared/             Reusable, non-routable UI pieces.
+│  │                      SelectMenu.razor(.css) ← in-DOM dropdown (see below)
 │  └─ Tests/             Feature components for the test browser.
 │                         TestBrowser.razor  ← PARKED (built, not yet wired in)
 │
@@ -50,6 +52,12 @@ RunnerUI/
   a scoped `Foo.razor.css` (or a `<style>` block) next to the component. No Bootstrap.
 - **Backend access:** inject an interface (e.g. `IDiscovery`) — never `new` a backend
   type in a component. Register it once in `MauiProgram.cs`.
+- **No native `<select>`:** use `SelectMenu` (`Components/Shared`) for dropdowns.
+  WebView2 renders a native `<select>`'s option list as a separate OS popup window
+  positioned from cached screen coordinates; in this unpackaged app those go stale when
+  the window moves, so the list opens offset from the control. `SelectMenu` renders its
+  options inside the page, so they move with the window. It's a drop-in for
+  `<select @bind-Value>` (supports `@bind-Value:after`, `Disabled`, `Placeholder`).
 
 ## Run it
 

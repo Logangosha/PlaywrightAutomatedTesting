@@ -52,7 +52,8 @@ backend must stay frontend-agnostic (no `Console` outside `Program.cs` and
 `Results.cs`).
 
 Design docs: `diagrams/sequence.md`, `diagrams/state-chart.md`,
-`diagrams/components.md` — illustrative; where a diagram and the code disagree,
+`diagrams/components.md` (run pipeline); `diagrams/launch.md`, `diagrams/setup.md`
+(app launch + first-run setup) — illustrative; where a diagram and the code disagree,
 the code is authoritative.
 
 ## UI (RunnerUI)
@@ -78,16 +79,30 @@ drive install → open → author:
   app itself. Installing the SDK/workload needs admin, so it self-elevates (one UAC
   prompt) *only* when one of those is missing.
 - `scripts/rebuild.ps1` — the one build-and-launch engine, used two ways distinguished by
-  `-WaitForPid`: opening the app builds first (so tests are always current) then
-  launches; the in-app "Restart & rebuild" banner passes the app's own process id so the
-  script waits for it to exit (unlocking the test DLL) before rebuilding and relaunching.
+  `-WaitForPid`: opening the app (no arg) runs a **fast staleness check** and builds only
+  if source changed (below), then launches; the in-app "Restart & rebuild" banner passes
+  the app's own process id so the script waits for it to exit (unlocking the test DLL),
+  then **always** rebuilds (staleness check skipped — it's a deliberate rebuild click)
+  and relaunches.
 - `scripts/launch-hidden.vbs` — runs `rebuild.ps1` via `WScript.Shell.Run` with window
   style 0, so opening the app (`launch.bat`, or the desktop shortcut which targets
   `wscript.exe` + this file directly) never flashes a console.
 
-Opening the app **always rebuilds first** — there is no startup staleness heuristic; the
-build is authoritative and (incremental) fast. Two failure surfaces, both in
-`ui/RunnerUI/Services`:
+Opening the app runs a **fast source-manifest staleness check**, not an unconditional
+build: `rebuild.ps1` walks the repo (pruning `bin`/`obj`/`logs`/`traces`/`results`/
+`configs`/etc.) and hashes every build input's *relative path + size + last-write-time*
+(~150 ms), comparing it to the hash of the last successful build stored in
+`logs/source-manifest.txt`. Match → launch the existing exe immediately, no build. Any
+file created / deleted / modified → build, then relaunch. The stored hash is written
+*after* a successful build (recomputed post-build, so anything the build itself touches
+won't force a rebuild-every-launch loop). This replaced an earlier DLL-timestamp check
+that missed edits (clock skew, adds/deletes that don't move the newest mtime). When a
+build *is* needed on the silent open path, `rebuild.ps1` shows a themed, movable splash
+(`Invoke-BuildWithSplash`: a WinForms window matching the OS light/dark theme, app icon +
+live status, built on a background job so it stays responsive) that closes when the app
+opens; the interactive "Restart & rebuild" path keeps its visible console instead.
+
+Two failure surfaces, both in `ui/RunnerUI/Services`:
 
 - **Build fails while opening silently** — `rebuild.ps1` writes the output to
   `logs/build-error.log` (gitignored; cleared at the start of every attempt) and still
@@ -122,6 +137,7 @@ for it to close, rather than the app invoking `dotnet build` in-process.
 - **"No test matches" is not a fault** — `TestProcess` returns an empty result set (user's selector mistake); any other missing-TRX case throws. An empty action run therefore *Completes* with 0 tests, `Success=true`, exit code 0 — a typo'd `actions` slice fails silently.
 - **xUnit runs test classes in parallel** (defaults — there is no `xunit.runner.json`), each `TestBase` launching its own Chromium; only facts within one class are serial. Expect multiple concurrent browsers on `actions: "all"`.
 - **The spawned `dotnet test` inherits the runner's full environment** — `TestProcess` only adds/overrides its explicit keys. A `STORAGE_STATE` or `LOGIN_*` variable already set in the user's shell leaks into runs where the runner meant them unset (e.g. `auth.mode: none`).
+- **No native `<select>` in the UI** — WebView2 renders a native `<select>`'s option list as a separate OS popup window positioned from cached screen coordinates; in this unpackaged app they go stale when the window moves, so the list opens offset from the control. Use `SelectMenu` (`ui/RunnerUI/Components/Shared`) instead — it renders options in-DOM so they move with the window. Drop-in for `<select @bind-Value>` (supports `@bind-Value:after`, `Disabled`, `Placeholder`).
 - **Manual auth mode verifies nothing** — after the `waitForUser` callback returns it waits 1s and saves whatever session exists. A user who confirms without logging in gets a saved logged-out session and downstream action-test failures, not a fault. Only auto mode validates login.
 - **`Module` must be a class-level trait** — `TestBase.GetModuleTraitValue` inspects only the class's attributes, so a method-level `Module` is invisible to trace pathing. `Category` is method-level by convention (per-fact) and unused by `TestBase`.
 - **`TestBase.DisposeAsync` saves the session before closing the context** — that ordering matters; the `SAVE_STORAGE_STATE` handoff is how a login test's session reaches Auth.
