@@ -1,15 +1,3 @@
-/// <summary>
-/// Runs the selected test actions via xUnit. Acts like a playlist: it knows *what*
-/// to run but delegates the actual iteration to xUnit. Called from RunActionsState
-/// in the runner's state machine.
-///
-/// Selection follows the trait convention: the runner-composed base selector
-/// (Site + Env + Kind=Action) scopes the run to this config's target, and the
-/// config's actions slice narrows within it. Because actions always require
-/// Kind=Action, login tests (Kind=Auth) can never run as actions.
-///
-/// The spawn/parse mechanics live in the shared <see cref="TestProcess"/>.
-/// </summary>
 public class Actions : IActions
 {
     /// <summary>
