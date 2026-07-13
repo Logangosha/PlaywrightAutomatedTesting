@@ -1,0 +1,70 @@
+@* In-DOM dropdown that replaces the native HTML <select>.
+
+   Why this exists: WebView2 renders a native <select>'s option list as a separate
+   OS-level popup window, positioned from cached screen coordinates. In an unpackaged
+   MAUI Blazor Hybrid app those coordinates go stale when the window is moved (and DPI
+   scaling makes it worse), so the list opens offset from — sometimes far from — the
+   control. Rendering the options inside the page means they're part of the WebView and
+   always move with the window.
+
+   Drop-in for `<select @bind-Value ...>`: two-way binds Value, supports @bind-Value:after,
+   Disabled, and a Placeholder shown when nothing is selected. *@
+
+<div class="sm @(_open ? "open" : "")">
+    <button type="button" class="sm-trigger" disabled="@Disabled" @onclick="Toggle">
+        <span class="sm-value @(Selected is null ? "placeholder" : "")">
+            @(Selected?.Label ?? Placeholder)
+        </span>
+        <span class="sm-caret">&#9662;</span>
+    </button>
+
+    @if (_open)
+    {
+        @* Transparent full-viewport catcher: any outside click closes the menu. *@
+        <div class="sm-backdrop" @onclick="Close"></div>
+        <div class="sm-menu" role="listbox">
+            @foreach (var opt in Options)
+            {
+                <button type="button"
+                        class="sm-item @(opt.Value == Value ? "selected" : "")"
+                        role="option"
+                        @onclick="() => Choose(opt.Value)">
+                    @opt.Label
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>One choice: the bound <c>Value</c> and the text shown for it.</summary>
+    public record Option(string Value, string Label);
+
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public IEnumerable<Option> Options { get; set; } = Array.Empty<Option>();
+    [Parameter] public string Placeholder { get; set; } = "Select…";
+    [Parameter] public bool Disabled { get; set; }
+
+    private bool _open;
+
+    private Option? Selected => Options.FirstOrDefault(o => o.Value == Value);
+
+    private void Toggle()
+    {
+        if (Disabled) return;
+        _open = !_open;
+    }
+
+    private void Close() => _open = false;
+
+    private async Task Choose(string value)
+    {
+        _open = false;
+        if (value != Value)
+        {
+            Value = value;
+            await ValueChanged.InvokeAsync(value);   // fires @bind-Value + its :after
+        }
+    }
+}

@@ -1,0 +1,109 @@
+@inject IDiscovery Discovery
+
+@* Read-only test browser. Renders the discovered tests as a collapsible
+   Site → Env → Module tree. Each row is tagged with its kind (Site / Env /
+   Module / Test / Auth) so the hierarchy is clear at a glance. Starts collapsed. *@
+
+<div class="test-browser">
+    <div class="tb-header">
+        <span class="tb-count">@_all.Count</span> tests across
+        <span class="tb-count">@_sites.Count</span> site(s)
+    </div>
+
+    @foreach (var site in _sites)
+    {
+        <details class="node site">
+            <summary>
+                <span class="kind kind-site">Site</span>
+                <span class="label">@site.Site</span>
+            </summary>
+
+            @foreach (var env in site.Envs)
+            {
+                <details class="node env">
+                    <summary>
+                        <span class="kind kind-env">Env</span>
+                        <span class="label">@env.Env</span>
+                    </summary>
+
+                    @foreach (var t in env.AuthTests)
+                    {
+                        <div class="test">
+                            <span class="kind kind-auth">Auth</span>
+                            <span class="method">@t.Method</span>
+                        </div>
+                    }
+
+                    @foreach (var mod in env.Modules)
+                    {
+                        <details class="node module">
+                            <summary>
+                                <span class="kind kind-module">Module</span>
+                                <span class="label">@mod.Module</span>
+                                <span class="pill">@mod.Tests.Count</span>
+                            </summary>
+                            @foreach (var t in mod.Tests)
+                            {
+                                <div class="test">
+                                    <span class="kind kind-test">Test</span>
+                                    @if (t.Category is not null)
+                                    {
+                                        <span class="badge cat">@t.Category</span>
+                                    }
+                                    <span class="method">@t.Method</span>
+                                </div>
+                            }
+                        </details>
+                    }
+                </details>
+            }
+        </details>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<DiscoveredTest> _all = Array.Empty<DiscoveredTest>();
+    private List<SiteNode> _sites = new();
+
+    protected override void OnInitialized()
+    {
+        _all = Discovery.Discover();
+        _sites = BuildTree(_all);
+    }
+
+    // Groups the flat list into Site → Env → (Auth tests + Modules → tests).
+    // A test tagged for several envs appears under each (Envs is multi-valued).
+    private static List<SiteNode> BuildTree(IReadOnlyList<DiscoveredTest> tests)
+    {
+        var rows = tests.SelectMany(t =>
+            (t.Envs.Count == 0 ? new[] { "(no env)" } : t.Envs)
+                .Select(env => (Env: env, Test: t)));
+
+        return rows
+            .GroupBy(r => r.Test.Site)
+            .OrderBy(g => g.Key)
+            .Select(siteG => new SiteNode(
+                siteG.Key,
+                siteG.GroupBy(r => r.Env)
+                     .OrderBy(g => g.Key)
+                     .Select(envG => new EnvNode(
+                         envG.Key,
+                         envG.Where(r => r.Test.Kind == "Auth")
+                             .Select(r => r.Test)
+                             .OrderBy(t => t.Method)
+                             .ToList(),
+                         envG.Where(r => r.Test.Kind != "Auth")
+                             .GroupBy(r => r.Test.Module ?? "(no module)")
+                             .OrderBy(g => g.Key)
+                             .Select(modG => new ModuleNode(
+                                 modG.Key,
+                                 modG.Select(r => r.Test).OrderBy(t => t.Method).ToList()))
+                             .ToList()))
+                     .ToList()))
+            .ToList();
+    }
+
+    private record SiteNode(string Site, List<EnvNode> Envs);
+    private record EnvNode(string Env, List<DiscoveredTest> AuthTests, List<ModuleNode> Modules);
+    private record ModuleNode(string Module, List<DiscoveredTest> Tests);
+}

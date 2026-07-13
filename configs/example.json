@@ -27,10 +27,18 @@
   },
 
   // Which action tests to run within this site + env: "all" or a slice using
-  // Category/Module. Combine with & (AND) or | (OR):
+  // Category/Module (to group) or FullyQualifiedName (to pick one exact test).
+  // Combine any of them with & (AND) or | (OR):
   //   "Category=Smoke"                          — one category
   //   "Category=Smoke&Module=HomePage"          — category within a module
   //   "Module=HomePage|Module=MemberManagement" — several specific modules
+  //   "FullyQualifiedName=PortalTests.Dev.Actions.HomePageTests.ClickLogin"
+  //                                             — one specific test
+  //   "FullyQualifiedName=PortalTests.Dev.Actions.HomePageTests.ClickLogin|FullyQualifiedName=PortalTests.Dev.Actions.HomePageTests.SearchBar"
+  //                                             — two specific tests (OR them)
+  //   "Category=Smoke|FullyQualifiedName=PortalTests.Dev.Actions.HomePageTests.SearchBar"
+  //                                             — a category plus one extra test
+  // FullyQualifiedName is Namespace.Class.Method 
   // Site/Env/Kind are composed automatically — never write them here.
   "actions": "Category=Smoke",
 

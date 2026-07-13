@@ -1,0 +1,128 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject TestsWatcher Watcher
+@inject AppRestarter Restarter
+@inject BuildStatus BuildStatus
+@inject ArtifactOpener Artifacts
+
+@* The app shell (M0.1): a collapsible left sidebar + the active screen.
+   Also hosts two app-wide banners:
+     - "tests changed" (author loop): the watcher raises an event when src/tests
+       changes, and Restart & rebuild hands off to rebuild.ps1.
+     - "last automatic rebuild failed": opening the app rebuilds with no visible
+       window (launch-hidden.vbs); if that build failed, this is where it surfaces
+       — you're looking at the previous good build, not silence. *@
+
+<div class="shell @(_collapsed ? "collapsed" : "")">
+    <nav class="sidebar">
+        <div class="side-top">
+            <span class="brand nav-label">Playwright Automation Tool</span>
+            <button class="collapse-btn" @onclick="Toggle" title="Toggle sidebar" aria-label="Toggle sidebar">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h16" />
+                </svg>
+            </button>
+        </div>
+
+        <NavLink class="nav-item" href="" Match="NavLinkMatch.All" title="New run">
+            <span class="nav-ico">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 4v16l13 -8z" />
+                </svg>
+            </span>
+            <span class="nav-label">New run</span>
+        </NavLink>
+
+        <NavLink class="nav-item" href="tests" title="Tests">
+            <span class="nav-ico">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 6l1.5 1.5l2.5 -2.5" /><path d="M4 12l1.5 1.5l2.5 -2.5" /><path d="M4 18l1.5 1.5l2.5 -2.5" />
+                    <path d="M11 6h9" /><path d="M11 12h9" /><path d="M11 18h9" />
+                </svg>
+            </span>
+            <span class="nav-label">Tests</span>
+        </NavLink>
+
+        <NavLink class="nav-item" href="history" title="History">
+            <span class="nav-ico">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" />
+                </svg>
+            </span>
+            <span class="nav-label">History</span>
+        </NavLink>
+
+        <NavLink class="nav-item" href="settings" title="Settings">
+            <span class="nav-ico">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 6h8" /><path d="M16 6h4" /><path d="M4 12h2" /><path d="M10 12h10" /><path d="M4 18h10" /><path d="M18 18h2" />
+                    <circle cx="14" cy="6" r="2" /><circle cx="8" cy="12" r="2" /><circle cx="16" cy="18" r="2" />
+                </svg>
+            </span>
+            <span class="nav-label">Settings</span>
+        </NavLink>
+    </nav>
+
+    <div class="main">
+        @if (_buildFailed)
+        {
+            <div class="rebuild-banner danger">
+                <span>The last automatic rebuild failed — you're viewing a previous build. Tests may be out of date.</span>
+                <span class="spacer"></span>
+                <button class="link-btn" @onclick="OpenBuildLog">View log</button>
+                <button class="link-btn" @onclick="() => _buildFailed = false">Dismiss</button>
+            </div>
+        }
+
+        @if (_testsChanged)
+        {
+            <div class="rebuild-banner">
+                <span>Tests changed — rebuild and restart to apply.</span>
+                <span class="spacer"></span>
+                <button class="btn-primary sm" @onclick="RebuildRestart">Restart &amp; rebuild</button>
+                <button class="link-btn" @onclick="() => _testsChanged = false">Dismiss</button>
+            </div>
+        }
+
+        <main class="content">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    private bool _collapsed;
+    private bool _testsChanged;
+    private bool _buildFailed;
+
+    protected override void OnInitialized()
+    {
+        // Changes made while the app was closed are handled by build-on-launch
+        // (launch.bat rebuilds before starting), so no startup staleness check here.
+        // The watcher only needs to catch edits made while the app is running.
+        Watcher.Changed += OnTestsChanged;
+        Watcher.Start();
+
+        // The build-on-launch can run with no visible window; if it failed, this is
+        // where that surfaces (we're running the previous good build right now).
+        _buildFailed = BuildStatus.HasError();
+    }
+
+    private void OnTestsChanged()
+    {
+        _testsChanged = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RebuildRestart() => Restarter.RebuildAndRestart();
+
+    private void OpenBuildLog()
+    {
+        if (BuildStatus.LogPath is not null)
+            try { Artifacts.OpenPath(BuildStatus.LogPath); } catch { /* best-effort */ }
+    }
+
+    private void Toggle() => _collapsed = !_collapsed;
+
+    public void Dispose() => Watcher.Changed -= OnTestsChanged;
+}
