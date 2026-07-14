@@ -39,7 +39,5 @@ The app rebuilds itself on each launch so it always runs the current tests.
 | **Faulted** | The run could not complete — bad setting, unreachable site, or failed login. The message states the cause. |
 
 ## More detail
-
-- [README.md](README.md) — config files, command-line runner, exit codes, troubleshooting.
 - [src/tests/README.md](src/tests/README.md) — writing tests.
 - [CLAUDE.md](CLAUDE.md) and [diagrams/](diagrams/) — architecture and internals.
